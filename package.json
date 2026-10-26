@@ -1,0 +1,51 @@
+{
+  "name": "dbcatz",
+  "productName": "DBCatz",
+  "version": "1.0.0",
+  "license": "GPL-3.0-only",
+  "private": true,
+  "description": "DBCatz — a database viewer for MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch on macOS; a tab per connection, local, over SSH, AWS IAM or Vault. Lists DevCatz's services when DevCatz is installed.",
+  "main": "./out/main/index.js",
+  "repository": "github:catzoidhub/DBCatz",
+  "scripts": {
+    "predev": "node scripts/dev-bundle-name.mjs",
+    "dev": "electron-vite dev",
+    "build": "node scripts/licenses.mjs && electron-vite build",
+    "licenses": "node scripts/licenses.mjs",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tsconfig.web.json",
+    "package": "node scripts/package.mjs",
+    "package:dir": "electron-vite build && electron-builder --mac dir",
+    "icons": "bun scripts/render-icons.ts",
+    "postinstall": "node node_modules/electron/install.js || bun node_modules/electron/install.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "electron-updater": "^6.8.11",
+    "mongodb": "^7.7.0",
+    "mysql2": "^3.24.6",
+    "pg": "^8.23.1",
+    "ssh2": "^1.17.0",
+    "tar": "^7.5.22"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "@types/ssh2": "^1.15.6",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "daisyui": "^5.7.50",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^6.0.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4",
+    "vue": "^3.5.44",
+    "vue-tsc": "^3.3.13"
+  },
+  "trustedDependencies": ["electron"],
+  "author": {
+    "name": "Mahryan Rakhmatullah"
+  }
+}

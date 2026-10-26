@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    DBCatz app icon — DevCatz's family look, turned to the database viewer.
+    · the same rounded tile and MrCatz (eyes are the code brackets "< >"), so the two apps read as siblings
+    · the tile is amber→orange: DevCatz's database layer colour, now the whole app
+    · MrCatz peers over a tall database cylinder (three discs) whose front face carries a magnifier lens:
+      "looking into the database"
+    Palette: amber #FFC14D / orange #F58A1F tile · indigo #3B33A8 ink · white fur · teal #2FD3BC highlight.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E8862A"/>
+      <stop offset="1" stop-color="#F7B541"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.38" r="0.65">
+      <stop offset="0" stop-color="#FFE3A3" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFE3A3" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1EEFF"/>
+    </linearGradient>
+    <!-- cylinder: indigo body, lighter rims -->
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3B33A8"/>
+      <stop offset="0.5" stop-color="#5A4FD8"/>
+      <stop offset="1" stop-color="#3B33A8"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B6ABFF"/>
+      <stop offset="1" stop-color="#7A6CF0"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#9DF2E6" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#2FD3BC" stop-opacity="0.75"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#5A2E00" flood-opacity="0.35"/>
+    </filter>
+    <filter id="soft" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#2A1A00" flood-opacity="0.35"/>
+    </filter>
+    <clipPath id="front">
+      <path d="M322 540 a190 50 0 0 0 380 0 v180 a190 50 0 0 1 -380 0 z"/>
+    </clipPath>
+    <filter id="tipglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <!-- tile -->
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#tile)" filter="url(#shadow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#glow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#sheen)"/>
+
+  <!-- the database: three discs, the front face as a viewer pane -->
+  <g filter="url(#soft)">
+    <path fill="url(#body)" d="M322 540 a190 50 0 0 0 380 0 v180 a190 50 0 0 1 -380 0 z"/>
+    <!-- disc lines on the body -->
+    <path fill="none" stroke="#B6ABFF" stroke-opacity="0.55" stroke-width="10" d="M322 600 a190 50 0 0 0 380 0 M322 660 a190 50 0 0 0 380 0"/>
+    <ellipse cx="512" cy="540" rx="190" ry="50" fill="url(#rim)"/>
+    <ellipse cx="512" cy="540" rx="150" ry="34" fill="#3B33A8" opacity="0.35"/>
+  </g>
+
+  <!-- magnifier lens over the front, looking into the data -->
+  <g filter="url(#soft)">
+    <circle cx="612" cy="690" r="78" fill="url(#lens)" stroke="#FFFFFF" stroke-width="18"/>
+    <!-- rows of data seen through the lens -->
+    <g clip-path="url(#front)" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.95">
+      <line x1="572" y1="668" x2="628" y2="668"/>
+      <line x1="572" y1="694" x2="652" y2="694"/>
+      <line x1="572" y1="720" x2="616" y2="720"/>
+    </g>
+    <line x1="668" y1="746" x2="744" y2="822" stroke="#FFFFFF" stroke-width="30" stroke-linecap="round"/>
+    <line x1="668" y1="746" x2="744" y2="822" stroke="#3B33A8" stroke-width="14" stroke-linecap="round"/>
+  </g>
+
+  <!-- MrCatz peering over the top disc, eyes as < > -->
+  <g transform="translate(512 40) scale(0.66) translate(-512 0)">
+    <!-- Catzoid family: robot neck ring under the chin (the chin covers its back half) -->
+    <ellipse cx="512" cy="782" rx="184" ry="40" fill="none" stroke="#2A2480" stroke-width="30"/>
+    <ellipse cx="512" cy="782" rx="184" ry="40" fill="none" stroke="#6D5DF6" stroke-width="16"/>
+    <!-- Catzoid family: antenna with a glowing teal tip -->
+    <g filter="url(#soft)">
+      <path d="M560 336 L582 196" fill="none" stroke="#3B33A8" stroke-width="22" stroke-linecap="round"/>
+      <circle cx="584" cy="176" r="40" fill="#2FD3BC" opacity="0.35" filter="url(#tipglow)"/>
+      <circle cx="584" cy="176" r="28" fill="#2FD3BC" stroke="#FFFFFF" stroke-width="8"/>
+    </g>
+    <g filter="url(#soft)">
+      <path fill="url(#fur)" stroke="url(#fur)" stroke-width="36" stroke-linejoin="round"
+        d="M268 418 L246 222 L446 334
+           C 487 318, 537 318, 578 334
+           L778 222 L756 418
+           C 792 470, 808 528, 808 586
+           C 808 712, 676 790, 512 790
+           C 348 790, 216 712, 216 586
+           C 216 528, 232 470, 268 418 Z"/>
+      <path fill="#F58A1F" opacity="0.28" d="M300 404 L286 282 L420 356 Z"/>
+      <path fill="#F58A1F" opacity="0.28" d="M724 404 L738 282 L604 356 Z"/>
+    </g>
+    <g fill="none" stroke="#3B33A8" stroke-width="48" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="446,548 392,596 446,644"/>
+      <polyline points="578,548 632,596 578,644"/>
+    </g>
+    <path fill="#3B33A8" stroke="#3B33A8" stroke-width="16" stroke-linejoin="round" d="M486 662 L538 662 L512 694 Z"/>
+    <path fill="none" stroke="#3B33A8" stroke-width="18" stroke-linecap="round" d="M470 724 C 490 744, 504 744, 512 728 C 520 744, 534 744, 554 724"/>
+  </g>
+</svg>
