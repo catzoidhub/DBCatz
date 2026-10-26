@@ -1,0 +1,26 @@
+name: Idea
+description: Something DBCatz could do, or do better.
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Ideas are welcome here — or **Help → Send Feedback…** inside DBCatz. Big ones are talked through here before anyone builds them.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The job, not the solution yet — "I copy query results into a spreadsheet to compare two databases".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+    validations:
+      required: true
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else
+      description: How you get by today, sketches, screenshots.
