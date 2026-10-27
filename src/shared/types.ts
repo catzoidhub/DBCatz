@@ -4,6 +4,8 @@
  * in step with it by hand.
  */
 
+import { keyLabel } from './platform';
+
 export type DbEngine = 'mysql' | 'mariadb' | 'postgresql' | 'redis' | 'valkey' | 'mongodb' | 'elasticsearch' | 'sqlite';
 
 /** A database service DevCatz runs, as it writes them for DBCatz (services.json). */
@@ -81,9 +83,9 @@ export const DV_AI_DEFAULTS: DvAiSettings = { enabled: false, provider: 'anthrop
 /** DBCatz's AI features, each with its own switch in Settings → AI (like DevCatz's). */
 export type DvAiFeature = 'query' | 'logs' | 'ask';
 export const DV_AI_FEATURES: { id: DvAiFeature; label: string; hint: string; sends: string }[] = [
-  { id: 'query', label: 'Ask AI in the Query tab (⌘⇧K)', hint: 'Plain words become a query, follow-ups, Fix with AI on a failed statement.', sends: 'the structure of the open database (tables, columns, keys, indexes; Redis key patterns), sample values only with Send samples on' },
+  { id: 'query', label: `Ask AI in the Query tab (${keyLabel('mod+shift+K')})`, hint: 'Plain words become a query, follow-ups, Fix with AI on a failed statement.', sends: 'the structure of the open database (tables, columns, keys, indexes; Redis key patterns), sample values only with Send samples on' },
   { id: 'logs', label: 'Ask AI in Logs', hint: 'Explains an error or a slow statement in the connection’s log and writes the fixed query.', sends: 'the log lines you ask about (statements, errors, timing; obvious secrets masked) and the structure of the tables they use' },
-  { id: 'ask', label: 'Ask DBCatz (⌘K)', hint: 'The ✦ button: plain-word commands turned into DBCatz steps you run one by one.', sends: 'connection names, engines and modes, where you are, the open database’s tables — no hosts, users, passwords or rows' },
+  { id: 'ask', label: `Ask DBCatz (${keyLabel('mod+K')})`, hint: 'The ✦ button: plain-word commands turned into DBCatz steps you run one by one.', sends: 'connection names, engines and modes, where you are, the open database’s tables — no hosts, users, passwords or rows' },
 ];
 
 /** Ask AI in Logs: some log lines and, optionally, a question about them. */

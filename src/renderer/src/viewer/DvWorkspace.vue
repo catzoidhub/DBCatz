@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel, words as platformWords } from '@shared/platform';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection, DvTable } from '@shared/types';
 import { attempt, api, notify, openDevCatzDownload } from '../store';
@@ -565,7 +566,7 @@ const tableIcon = (t: DvTable) => (t.type === 'view' ? 'M2 10s3-5 8-5 8 5 8 5-3 
 /** Open in DevCatz on a service's error screen; without the DevCatz app, its download page instead. */
 async function openService(serviceId: string) {
   if (await api.openInDevCatz(serviceId)) return;
-  notify('info', 'DevCatz is not installed on this Mac: opening its download page');
+  notify('info', `DevCatz is not installed on ${platformWords.thisComputer}: opening its download page`);
   await openDevCatzDownload();
 }
 </script>
@@ -589,7 +590,7 @@ async function openService(serviceId: string) {
         </div>
         <div v-if="!error && !connecting && !disconnected" class="flex gap-1">
           <DvDbPicker ref="picker" v-model="db" :conn="c" :databases="databases" />
-          <button class="btn btn-sm btn-square" :class="{ 'opacity-60': refreshing }" :title="`Reload the ${W.dbs} and ${W.tables} (⌘R)`" :disabled="refreshing" @click="refreshAll"><span v-if="refreshing" class="loading loading-spinner loading-xs" /><template v-else>↻</template></button>
+          <button class="btn btn-sm btn-square" :class="{ 'opacity-60': refreshing }" :title="`Reload the ${W.dbs} and ${W.tables} (${keyLabel('mod+R')})`" :disabled="refreshing" @click="refreshAll"><span v-if="refreshing" class="loading loading-spinner loading-xs" /><template v-else>↻</template></button>
           <button v-if="!kv && c.engine !== 'elasticsearch'" class="btn btn-sm btn-square" :title="isReadOnly(c) ? 'Read-only connection' : `Create ${W.db}`" :disabled="isReadOnly(c)" @click="dialog = { kind: 'createDb' }">+</button>
         </div>
         <label v-if="!kv && !error && !connecting && !disconnected" class="input input-sm flex w-full items-center gap-2">
@@ -643,13 +644,13 @@ async function openService(serviceId: string) {
       </div>
 
       <div v-if="!error && !connecting && !disconnected" class="flex gap-1 border-t border-base-300/60 p-2">
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" :class="{ 'btn-active': mode === 'query' }" :title="kv ? 'Run commands (⌘T)' : 'Write a query (⌘T)'" @click="openQuery">
+        <button class="btn btn-ghost btn-xs flex-1 gap-1" :class="{ 'btn-active': mode === 'query' }" :title="kv ? `Run commands (${keyLabel('mod+T')})` : `Write a query (${keyLabel('mod+T')})`" @click="openQuery">
           <svg viewBox="0 0 20 20" class="size-3.5" fill="currentColor"><path d="M7.3 5.3a1 1 0 0 1 1.4 0l4 4a1 1 0 0 1 0 1.4l-4 4a1 1 0 0 1-1.4-1.4L10.6 10 7.3 6.7a1 1 0 0 1 0-1.4Z" /></svg>{{ kv ? 'Command' : 'Query' }}
         </button>
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" :class="{ 'btn-active': mode === 'logs' }" title="Server log and DBCatz activity (⌘L)" @click="mode = 'logs'">Logs</button>
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" title="Export… (⌘E)" @click="dialog = { kind: 'export', tables: table ? [table] : [] }">Export</button>
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" title="Import… (⌘I)" @click="dialog = { kind: 'import' }">Import</button>
-        <button class="btn btn-ghost btn-xs btn-square" title="Refresh (⌘R)" @click="refreshAll">↻</button>
+        <button class="btn btn-ghost btn-xs flex-1 gap-1" :class="{ 'btn-active': mode === 'logs' }" :title="`Server log and DBCatz activity (${keyLabel('mod+L')})`" @click="mode = 'logs'">Logs</button>
+        <button class="btn btn-ghost btn-xs flex-1 gap-1" :title="`Export… (${keyLabel('mod+E')})`" @click="dialog = { kind: 'export', tables: table ? [table] : [] }">Export</button>
+        <button class="btn btn-ghost btn-xs flex-1 gap-1" :title="`Import… (${keyLabel('mod+I')})`" @click="dialog = { kind: 'import' }">Import</button>
+        <button class="btn btn-ghost btn-xs btn-square" :title="`Refresh (${keyLabel('mod+R')})`" @click="refreshAll">↻</button>
       </div>
     </aside>
 

@@ -5,6 +5,7 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { DvUninstallPlan } from '@shared/types';
 import { readShared, SHARED_DIR } from './shared';
+import { words } from '@shared/platform';
 
 /**
  * Uninstall DBCatz (Catzoid family TODO #55; the Homebrew cask's `zap` lists the same paths): what DBCatz put on this
@@ -66,14 +67,14 @@ export async function uninstallPlan(): Promise<DvUninstallPlan> {
     { label: 'Web storage', path: lib('HTTPStorages', BUNDLE_ID) },
   ].filter((f) => existsSync(f.path));
   const items = [...files];
-  if (await keychainHas(SAFE_STORAGE)) items.push({ label: 'Connection secrets (Keychain)', path: `Keychain: ${SAFE_STORAGE}` });
+  if (await keychainHas(SAFE_STORAGE)) items.push({ label: `Connection secrets (${words.secretStore})`, path: `Keychain: ${SAFE_STORAGE}` });
   const b = bundle();
   const homebrew = homebrewInstall();
   if (b && app.isPackaged) items.push({ label: homebrew ? 'The app (brew uninstall --cask dbcatz)' : 'The app (moved to the Trash)', path: b });
 
   const shared: { label: string; path: string }[] = [];
   if (existsSync(join(SHARED_DIR, 'shared.json'))) shared.push({ label: 'Theme, AI provider and site address shared by the Catzoid apps', path: join(SHARED_DIR, 'shared.json') });
-  for (const p of readShared().ai?.keys ?? []) if (await keychainHas(SHARED_KEYS, p)) shared.push({ label: `${p} API key (Keychain)`, path: `Keychain: ${SHARED_KEYS} · ${p}` });
+  for (const p of readShared().ai?.keys ?? []) if (await keychainHas(SHARED_KEYS, p)) shared.push({ label: `${p} API key (${words.secretStore})`, path: `Keychain: ${SHARED_KEYS} · ${p}` });
 
   const otherApps: string[] = [];
   for (const o of OTHERS) if (await installed(o.id, o.name)) otherApps.push(o.name);

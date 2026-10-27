@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { words } from '@shared/platform';
 import { computed, onMounted, ref } from 'vue';
 import type { AboutInfo } from '@shared/types';
 import { api, attempt, notify, reportOpen, update, updateOpen } from '../store';
@@ -56,7 +57,7 @@ function checkUpdates() {
 function copyDetails() {
   const i = info.value;
   if (!i) return;
-  void navigator.clipboard.writeText(`DBCatz ${i.version} (${i.arch})\nmacOS ${i.macos}\nElectron ${i.electron} · Chromium ${i.chrome} · Node.js ${i.node}`);
+  void navigator.clipboard.writeText(`DBCatz ${i.version} (${i.arch})\n${words.os} ${i.macos}\nElectron ${i.electron} · Chromium ${i.chrome} · Node.js ${i.node}`);
   notify('success', 'Version details copied');
 }
 </script>
@@ -117,7 +118,7 @@ function copyDetails() {
         <button class="btn btn-ghost btn-xs" :disabled="!info" @click="copyDetails">Copy</button>
       </div>
       <dl v-if="info" class="selectable grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
-        <dt class="opacity-60">macOS</dt><dd class="font-mono text-xs leading-5">{{ info.macos }}</dd>
+        <dt class="opacity-60">{{ words.os }}</dt><dd class="font-mono text-xs leading-5">{{ info.macos }}</dd>
         <dt class="opacity-60">Electron</dt><dd class="font-mono text-xs leading-5">{{ info.electron }}</dd>
         <dt class="opacity-60">Chromium</dt><dd class="font-mono text-xs leading-5">{{ info.chrome }}</dd>
         <dt class="opacity-60">Node.js</dt><dd class="font-mono text-xs leading-5">{{ info.node }}</dd>
@@ -130,7 +131,7 @@ function copyDetails() {
     <div class="card-body flex-row items-center gap-3">
       <div class="min-w-0 flex-1">
         <h2 class="font-semibold">Uninstall DBCatz</h2>
-        <p class="text-xs opacity-60">Removes DBCatz, its saved connections and its Keychain items from this Mac. Exports and backups stay.</p>
+        <p class="text-xs opacity-60">Removes DBCatz, its saved connections and its {{ words.secretStore }} items from {{ words.thisComputer }}. Exports and backups stay.</p>
       </div>
       <button class="btn btn-sm btn-outline btn-error shrink-0" @click="uninstalling = true">Uninstall…</button>
     </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { onBeforeUnmount, ref } from 'vue';
 import { back, backList, canBack, canForward, forward, forwardList, go } from './nav';
 
@@ -24,10 +25,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
 
 <template>
   <div class="flex shrink-0 items-center">
-    <button class="btn btn-ghost btn-xs btn-square" :disabled="!canBack" title="Back (⌘[) · right-click for recent screens" @click="back" @contextmenu.prevent="openMenu($event, -1)">
+    <button class="btn btn-ghost btn-xs btn-square" :disabled="!canBack" :title="`Back (${keyLabel('mod+[')}) · right-click for recent screens`" @click="back" @contextmenu.prevent="openMenu($event, -1)">
       <svg viewBox="0 0 20 20" class="size-4" fill="currentColor"><path fill-rule="evenodd" d="M12.8 4.2a.75.75 0 0 1 0 1.06L8.06 10l4.74 4.74a.75.75 0 1 1-1.06 1.06l-5.27-5.27a.75.75 0 0 1 0-1.06l5.27-5.27a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" /></svg>
     </button>
-    <button class="btn btn-ghost btn-xs btn-square" :disabled="!canForward" title="Forward (⌘]) · right-click for recent screens" @click="forward" @contextmenu.prevent="openMenu($event, 1)">
+    <button class="btn btn-ghost btn-xs btn-square" :disabled="!canForward" :title="`Forward (${keyLabel('mod+]')}) · right-click for recent screens`" @click="forward" @contextmenu.prevent="openMenu($event, 1)">
       <svg viewBox="0 0 20 20" class="size-4" fill="currentColor"><path fill-rule="evenodd" d="M7.2 15.8a.75.75 0 0 1 0-1.06L11.94 10 7.2 5.26a.75.75 0 1 1 1.06-1.06l5.27 5.27a.75.75 0 0 1 0 1.06L8.26 15.8a.75.75 0 0 1-1.06 0Z" clip-rule="evenodd" /></svg>
     </button>
     <Teleport v-if="menu" to="body">

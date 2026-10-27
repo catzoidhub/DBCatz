@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import type { DvAiAnswer, DvAiPreview, DvAiRequest, DvAiTurn, DvConnection, DvResult, DvRows, DvSavedQuery, DvTable } from '@shared/types';
 import { aiOn as aiOnFeature, attempt, api, notify, saveSettings, settings, showSettings } from '../store';
@@ -496,14 +497,14 @@ const label = (x: Editor, i: number) => x.savedName ?? `${W.query === 'SQL' ? 'Q
           {{ label(x, i) }}
           <span class="dv-tab-close" @click.stop="closeEditor(x.id)">×</span>
         </button>
-        <button class="dv-tab-add" title="New editor (⌘T)" @click="newTab()">+</button>
+        <button class="dv-tab-add" :title="`New editor (${keyLabel('mod+T')})`" @click="newTab()">+</button>
       </div>
-      <button v-if="aiHere && aiOn" class="btn btn-ghost btn-xs gap-1" :class="{ 'btn-active': ed.ai.open }" :title="`Ask AI: write the ${aiWrites} from plain words (⌘⇧K)`" @click="ed.ai.open ? closeAi() : askAi()">
+      <button v-if="aiHere && aiOn" class="btn btn-ghost btn-xs gap-1" :class="{ 'btn-active': ed.ai.open }" :title="`Ask AI: write the ${aiWrites} from plain words (${keyLabel('mod+shift+K')})`" @click="ed.ai.open ? closeAi() : askAi()">
         <svg viewBox="0 0 20 20" class="size-3.5 text-primary" fill="currentColor"><path d="M10 2.5a.75.75 0 0 1 .7.48l1.3 3.38 3.38 1.3a.75.75 0 0 1 0 1.4L12 10.36l-1.3 3.38a.75.75 0 0 1-1.4 0L8 10.36 4.62 9.06a.75.75 0 0 1 0-1.4L8 6.36l1.3-3.38a.75.75 0 0 1 .7-.48ZM15.5 12a.5.5 0 0 1 .47.33l.5 1.2 1.2.5a.5.5 0 0 1 0 .94l-1.2.5-.5 1.2a.5.5 0 0 1-.94 0l-.5-1.2-1.2-.5a.5.5 0 0 1 0-.94l1.2-.5.5-1.2a.5.5 0 0 1 .47-.33Z" /></svg>Ask AI
       </button>
       <button class="btn btn-ghost btn-xs" :title="ed.savedId ? `Save changes to ${ed.savedName}` : 'Save this query'" @click="saveClick">{{ ed.savedId ? 'Save' : 'Save…' }}</button>
-      <button v-if="isSql(e)" class="btn btn-ghost btn-xs" title="Format (⌘⇧F)" @click="format">Format</button>
-      <button class="btn btn-primary btn-xs gap-1" title="Run all, or the selection (⌘⏎)" :disabled="ed.running || !ed.text.trim()" @click="run">
+      <button v-if="isSql(e)" class="btn btn-ghost btn-xs" :title="`Format (${keyLabel('mod+shift+F')})`" @click="format">Format</button>
+      <button class="btn btn-primary btn-xs gap-1" :title="`Run all, or the selection (${keyLabel('mod+⏎')})`" :disabled="ed.running || !ed.text.trim()" @click="run">
         <span v-if="ed.running" class="loading loading-spinner loading-xs" />
         <svg v-else viewBox="0 0 20 20" class="size-3" fill="currentColor"><path d="M6 4.5v11a1 1 0 0 0 1.5.9l9-5.5a1 1 0 0 0 0-1.8l-9-5.5A1 1 0 0 0 6 4.5Z" /></svg>Run
       </button>
@@ -554,7 +555,7 @@ const label = (x: Editor, i: number) => x.savedName ?? `${W.query === 'SQL' ? 'Q
               <span v-for="t in ed.ai.answer.tables" :key="t" class="badge badge-ghost badge-sm font-mono">{{ t }}</span>
             </div>
             <div class="mt-1.5 flex items-center gap-3 text-[11px] opacity-55">
-              <span>⏎ asks · ⇧⏎ new line · the {{ aiWrites === 'query' ? 'query goes' : `${aiWrites} go` }} into the editor, you press Run</span>
+              <span>⏎ asks · {{ keyLabel('shift+⏎') }} new line · the {{ aiWrites === 'query' ? 'query goes' : `${aiWrites} go` }} into the editor, you press Run</span>
               <label class="flex cursor-pointer items-center gap-1" :class="{ 'text-warning opacity-100': samplesOn }" :title="samplesOn ? `On for ${conn.name}: a few values per ${isKv(e) ? 'key pattern' : W.table} go with the structure (clipped). Click to stop.` : `Off: only the structure goes. On: ${isKv(e) ? 'one value per key pattern' : `${3} ${W.rows} per ${W.table}`} go too (clipped), so the AI sees how values are written. For ${conn.name} only.`"><input type="checkbox" class="toggle toggle-xs" :checked="samplesOn" @change="toggleSamples" />Send samples</label>
               <span class="flex-1" />
               <a class="link" :title="samplesOn ? 'Exactly what goes to the model: the instructions, the structure and the sample values' : isKv(e) ? 'Exactly what goes to the model: the instructions and the key name patterns of this database, never values' : 'Exactly what goes to the model: the instructions and the structure of this database, never rows'" @click="showPreview">Preview what is sent</a>
@@ -569,7 +570,7 @@ const label = (x: Editor, i: number) => x.savedName ?? `${W.query === 'SQL' ? 'Q
           <span class="dv-split-grip" />
           <span class="truncate">{{ db }}</span>
           <span class="opacity-60">·</span>
-          <span class="truncate opacity-80">⌘⏎ runs everything, or just the selected text<template v-if="complete"> · Ctrl+Space suggests</template></span>
+          <span class="truncate opacity-80">{{ keyLabel('mod+⏎') }} runs everything, or just the selected text<template v-if="complete"> · Ctrl+Space suggests</template></span>
           <span class="flex-1" />
           <span v-if="isKv(e)" class="shrink-0 opacity-80">one command per line</span>
           <span v-else-if="isSql(e)" class="shrink-0 opacity-80">statements end with ;</span>

@@ -3,6 +3,7 @@ import { aiProvider, DV_ASK_ARGS, DV_ASK_KINDS, DV_ASK_WRITES, DV_DOCUMENT, DV_K
 import type { DbViewerManager } from './dbviewer/manager';
 import { rows as readRows } from './dbviewer/ops';
 import { aiKey, needFeature, settings } from './settings';
+import { words } from '@shared/platform';
 
 /**
  * Ask AI: writes a query from plain words for one database. Only the
@@ -289,7 +290,7 @@ export class AskAi {
       }
     }
     const system = [
-      'You are the command line of DBCatz, a database viewer for macOS (MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB, Elasticsearch). The user says in plain words what they want; you answer with DBCatz actions that do it (the user clicks each), or just answer when it is a question.',
+      `You are the command line of DBCatz, a database viewer for ${words.os} (MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB, Elasticsearch). The user says in plain words what they want; you answer with DBCatz actions that do it (the user clicks each), or just answer when it is a question.`,
       'DBCatz screens: Connections (the list, a form for a new one), a tab per connection with a database picker, the tables in a sidebar and Data / Structure / Query / Logs views (Keys / Command for Redis), Export / Import / Backup dialogs, Jobs, Settings (Appearance, AI).',
       '- Use the connection ids and the database / table names below; never invent them. When the request names something not listed, say so. Set "connection" on every action that needs one.',
       '- When the answer is in the context (which table has a column, how many tables), say it in explanation and add the action that shows it (open-table). Questions about the data itself ("how many orders today") get a write-query action.',

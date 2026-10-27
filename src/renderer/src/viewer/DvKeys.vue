@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, onMounted, ref, watch } from 'vue';
 import type { DvConnection, DvKey, DvKeyInput, DvKeyValue } from '@shared/types';
 import { attempt, api, notify } from '../store';
@@ -253,8 +254,8 @@ const TYPE_COLOR: Record<string, string> = { string: 'badge-info', list: 'badge-
           <input ref="filterInput" v-model="draft" class="grow" placeholder="*" spellcheck="false" />
         </label>
         <button class="btn btn-sm">Scan</button>
-        <button type="button" class="btn btn-sm" title="New key (⌘⇧I)" @click="startNew">+ Key</button>
-        <button type="button" class="btn btn-sm" :class="{ 'btn-error btn-soft': selected.size }" :disabled="!selected.size && !open" title="Delete (⌘⌫)" @click="deleteSelected">Delete{{ selected.size ? ` ${selected.size}` : '' }}</button>
+        <button type="button" class="btn btn-sm" :title="`New key (${keyLabel('mod+shift+I')})`" @click="startNew">+ Key</button>
+        <button type="button" class="btn btn-sm" :class="{ 'btn-error btn-soft': selected.size }" :disabled="!selected.size && !open" :title="`Delete (${keyLabel('mod+⌫')})`" @click="deleteSelected">Delete{{ selected.size ? ` ${selected.size}` : '' }}</button>
       </form>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div v-if="loading && !keys.length" class="grid h-full place-items-center opacity-60"><span class="loading loading-spinner" /></div>
@@ -273,7 +274,7 @@ const TYPE_COLOR: Record<string, string> = { string: 'badge-info', list: 'badge-
       </div>
       <div class="flex h-8 shrink-0 items-center gap-2 border-t border-base-300/60 px-3 text-[11px] opacity-70">
         <span>{{ fmtNum(keys.length) }}{{ total > keys.length ? ` of ${fmtNum(total)} (narrow the pattern to see the rest)` : '' }} keys</span>
-        <span class="flex-1" /><span>click a key to open its value · ⌘-click selects several</span>
+        <span class="flex-1" /><span>click a key to open its value · {{ keyLabel('mod') }}-click selects several</span>
       </div>
     </div>
 

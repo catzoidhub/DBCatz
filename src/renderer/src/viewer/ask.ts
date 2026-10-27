@@ -4,6 +4,7 @@ import { splitStatements } from '@shared/sqlsplit';
 import { api, openDevCatzDownload, saveSettings, settingsTab, showSettings } from '../store';
 import { goTo } from './nav';
 import { active, connections, dispatch, editing, isKv, isProd, isReadOnly, isSql, refreshConnections, showJobs } from './viewer';
+import { words } from '@shared/platform';
 
 /**
  * Runs one step Ask DBCatz proposed, after the user clicked it (and, for a
@@ -133,7 +134,7 @@ export async function runAsk(a: DvAskAction): Promise<string> {
       const found = await api.openInDevCatz(conn.serviceId);
       if (!found) {
         await openDevCatzDownload();
-        throw new Error('DevCatz is not installed on this Mac: its download page is open');
+        throw new Error(`DevCatz is not installed on ${words.thisComputer}: its download page is open`);
       }
       return `DevCatz opened at ${conn.name}${conn.running ? '' : ': start it there'}`;
     }

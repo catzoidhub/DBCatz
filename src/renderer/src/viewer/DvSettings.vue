@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel, words } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { aiProvider, DV_AI_FEATURES, DV_AI_PROVIDERS, type DvAiFeature, type DvAiProvider, type DvReportSettings, type Theme } from '@shared/types';
 import { api, attempt, notify, saveSettings, settings, settingsTab } from '../store';
@@ -22,7 +23,7 @@ const TABS = [
   { id: 'about', label: 'About' },
 ] as const;
 const THEMES: { value: Theme; label: string; hint: string }[] = [
-  { value: 'system', label: 'Auto', hint: 'Follows macOS' },
+  { value: 'system', label: 'Auto', hint: `Follows ${words.os}` },
   { value: 'light', label: 'Light', hint: 'Always light' },
   { value: 'dark', label: 'Dark', hint: 'Always dark' },
 ];
@@ -199,7 +200,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 <input type="checkbox" class="toggle toggle-primary toggle-sm mt-0.5" :checked="ai.enabled" @change="saveSettings({ ai: { enabled: ($event.target as HTMLInputElement).checked } })" />
                 <span>
                   Use AI in DBCatz
-                  <span class="block text-xs opacity-60">Writes queries from plain words, explains errors and slow statements in Logs, and takes plain-word commands (⌘K). Nothing is sent until you press an AI button; every one has <b>Preview what is sent</b>, and nothing it suggests runs without your click. This switch is for DBCatz only; the provider below is shared with all Catzoid apps.</span>
+                  <span class="block text-xs opacity-60">Writes queries from plain words, explains errors and slow statements in Logs, and takes plain-word commands ({{ keyLabel('mod+K') }}). Nothing is sent until you press an AI button; every one has <b>Preview what is sent</b>, and nothing it suggests runs without your click. This switch is for DBCatz only; the provider below is shared with all Catzoid apps.</span>
                 </span>
               </label>
             </div>
@@ -220,7 +221,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 <span class="w-28 shrink-0 pt-1.5">API key</span>
                 <div class="min-w-0 flex-1 space-y-1.5">
                   <div v-if="hasKey && !replacing" class="flex items-center gap-2">
-                    <span class="input input-sm flex min-w-0 flex-1 items-center gap-2 text-xs opacity-80"><span class="status status-success status-xs shrink-0" /><span class="truncate">Saved in the macOS Keychain (Catzoid AI)</span></span>
+                    <span class="input input-sm flex min-w-0 flex-1 items-center gap-2 text-xs opacity-80"><span class="status status-success status-xs shrink-0" /><span class="truncate">Saved in the {{ words.secretStoreFull }} (Catzoid AI)</span></span>
                     <button class="btn btn-sm" @click="replacing = true">Replace</button>
                     <button class="btn btn-ghost btn-sm text-error" @click="removeKey">Remove</button>
                   </div>
@@ -230,7 +231,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                     <button v-if="replacing" type="button" class="btn btn-ghost btn-sm" @click="replacing = false; keyInput = ''">Cancel</button>
                   </form>
                   <p class="text-xs opacity-60">
-                    Kept only on this Mac in the Keychain, shared with Catzoid apps, never shown again or sent anywhere but {{ info.name }}.
+                    Kept only on {{ words.thisComputer }} in the {{ words.secretStore }}, shared with Catzoid apps, never shown again or sent anywhere but {{ info.name }}.
                     <a v-if="info.keyUrl" class="link" @click="api.openUrl(info.keyUrl)">Get a key</a>
                   </p>
                 </div>
@@ -243,7 +244,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                   <input v-if="editableUrl" v-model="urlInput" class="input input-sm w-full font-mono text-xs" :placeholder="info.baseUrl" spellcheck="false" @change="saveUrl" @keydown.enter="saveUrl" />
                   <span v-else class="input input-sm flex w-full items-center font-mono text-xs opacity-60">{{ info.baseUrl }}</span>
                   <p v-if="ai.provider === 'zai'" class="text-xs opacity-60">Use a <b>Standard API key</b> (pay-as-you-go balance). GLM Coding Plan keys (ZCode and other coding tools) are only for Z.ai’s supported tools and answer “insufficient balance” here. Keys from bigmodel.cn (mainland China) use <code>https://open.bigmodel.cn/api/paas/v4</code>.</p>
-                  <p v-else-if="ai.provider === 'ollama'" class="text-xs opacity-60">Runs on this Mac, nothing leaves it. Install from ollama.com, then e.g. <code>ollama pull qwen2.5-coder</code>.</p>
+                  <p v-else-if="ai.provider === 'ollama'" class="text-xs opacity-60">Runs on {{ words.thisComputer }}, nothing leaves it. Install from ollama.com, then e.g. <code>ollama pull qwen2.5-coder</code>.</p>
                   <p v-else-if="ai.provider === 'openai-compatible'" class="text-xs opacity-60">Any server with an OpenAI-style <code>/chat/completions</code>: LM Studio, vLLM, LiteLLM, a company gateway.</p>
                 </div>
               </div>

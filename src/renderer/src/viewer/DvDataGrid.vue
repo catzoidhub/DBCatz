@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, onMounted, ref, watch } from 'vue';
 import type { DvColumn, DvConnection, DvGridPrefs, DvRows, DvStructure } from '@shared/types';
 import { attempt, api, notify } from '../store';
@@ -319,7 +320,7 @@ function toggleRow(i: number, e: MouseEvent) {
 }
 function deleteSelected() {
   if (readOnly.value) return notify('info', 'This connection is read-only');
-  if (!selected.value.size) return notify('info', `Select ${W.rows} first (click; ⌘-click or ⇧-click for several).`);
+  if (!selected.value.size) return notify('info', `Select ${W.rows} first (click; ${keyLabel('mod')}-click or ${keyLabel('shift')}-click for several).`);
   if (!editable.value) return notify('info', `This ${W.table} has no primary key in the result; delete with a query instead.`);
   confirmDelete.value = true;
 }
@@ -391,8 +392,8 @@ function display(v: unknown, col: string): string {
       </form>
       <span v-else class="min-w-0 flex-1 truncate text-xs opacity-60">Rows of <span class="font-mono">{{ table }}</span> — editable like the Data tab; rerun the query to refresh.</span>
       <span class="w-px self-stretch bg-base-300/60" />
-      <button class="btn btn-sm" :title="readOnly ? 'Read-only connection' : 'Insert row (⌘⇧I)'" :disabled="!!inserting || readOnly" @click="startInsert">+ {{ W.row }}</button>
-      <button class="btn btn-sm" :class="{ 'btn-error btn-soft': selected.size }" title="Delete selected rows (⌘⌫)" :disabled="!selected.size" @click="deleteSelected">Delete{{ selected.size ? ` ${selected.size}` : '' }}</button>
+      <button class="btn btn-sm" :title="readOnly ? 'Read-only connection' : `Insert row (${keyLabel('mod+shift+I')})`" :disabled="!!inserting || readOnly" @click="startInsert">+ {{ W.row }}</button>
+      <button class="btn btn-sm" :class="{ 'btn-error btn-soft': selected.size }" :title="`Delete selected rows (${keyLabel('mod+⌫')})`" :disabled="!selected.size" @click="deleteSelected">Delete{{ selected.size ? ` ${selected.size}` : '' }}</button>
       <button v-if="customized" class="btn btn-ghost btn-sm btn-square" title="Reset column widths and order" @click="resetColumns">
         <svg viewBox="0 0 20 20" class="size-4" fill="currentColor"><path d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75Zm0 5A.75.75 0 0 1 2.75 9h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 9.75Zm.75 4.25a.75.75 0 0 0 0 1.5h8.5a.75.75 0 0 0 0-1.5h-8.5Z" /></svg>
       </button>

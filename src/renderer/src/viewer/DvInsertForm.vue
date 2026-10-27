@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, onMounted, reactive, ref } from 'vue';
 import type { DvColumn } from '@shared/types';
 import DvCellEditor from './DvCellEditor.vue';
@@ -108,7 +109,7 @@ onMounted(() => first.value?.querySelector<HTMLElement>('input, select, textarea
         <span class="flex-1" />
         <button type="button" class="btn btn-ghost btn-sm" :disabled="busy" @click="emit('cancel')">Cancel <kbd class="kbd kbd-xs ml-1 opacity-60">esc</kbd></button>
         <button type="submit" class="btn btn-primary btn-sm" :disabled="busy">
-          <span v-if="busy" class="loading loading-spinner loading-xs" />Insert {{ rowWord }} <kbd class="kbd kbd-xs ml-1 border-0 bg-white/20 text-current">⌘⏎</kbd>
+          <span v-if="busy" class="loading loading-spinner loading-xs" />Insert {{ rowWord }} <kbd class="kbd kbd-xs ml-1 border-0 bg-white/20 text-current">{{ keyLabel('mod+⏎') }}</kbd>
         </button>
       </div>
     </form>

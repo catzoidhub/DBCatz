@@ -16,6 +16,7 @@ import { splitStatements } from './driver';
 import * as ops from './ops';
 import { dropTables, truncateTables } from './bulk';
 import { backupTo, exportTo, importFrom, type Progress } from './transfer';
+import { words } from '@shared/platform';
 
 /**
  * DBCatz, the database viewer: connections (every DevCatz database service,
@@ -82,7 +83,7 @@ export class DbViewerManager {
 
   private enc(v: string): string {
     if (!v) return '';
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('macOS Keychain encryption is not available');
+    if (!safeStorage.isEncryptionAvailable()) throw new Error(`${words.secretStoreFull} encryption is not available`);
     return safeStorage.encryptString(v).toString('base64');
   }
   private dec(v: string | undefined): string {

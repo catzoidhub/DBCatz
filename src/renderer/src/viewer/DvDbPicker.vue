@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import type { DvConnection, DvDbPrefs } from '@shared/types';
 import { api } from '../store';
@@ -138,7 +139,7 @@ function parts(name: string): [string, string, string] {
 
 <template>
   <div class="relative min-w-0 flex-1">
-    <button type="button" class="select select-sm w-full min-w-0 text-left font-mono text-xs" :title="`Choose a ${W.db} (⌘P)`" @click="open ? close() : show()">
+    <button type="button" class="select select-sm w-full min-w-0 text-left font-mono text-xs" :title="`Choose a ${W.db} (${keyLabel('mod+P')})`" @click="open ? close() : show()">
       <span class="min-w-0 flex-1 truncate">{{ modelValue || `No ${W.db}` }}</span>
     </button>
     <template v-if="open">

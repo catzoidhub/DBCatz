@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { words } from '@shared/platform';
 import { openDevCatzDownload } from '../store';
 import devcatzLogo from '../assets/logos/devcatz.png';
 
@@ -15,7 +16,7 @@ defineProps<{ kind: 'missing' | 'none'; count?: number }>();
     <div class="min-w-0 flex-1">
       <p class="text-[12.5px] font-semibold leading-tight">{{ kind === 'missing' ? 'DevCatz is not installed' : 'Local databases with DevCatz' }}</p>
       <p class="mt-0.5 text-[11.5px] leading-snug opacity-65">
-        <template v-if="kind === 'missing'">{{ count === 1 ? 'This service needs' : `These ${count ?? ''} services need` }} DevCatz to start. Its settings were left on this Mac.</template>
+        <template v-if="kind === 'missing'">{{ count === 1 ? 'This service needs' : `These ${count ?? ''} services need` }} DevCatz to start. Its settings were left on {{ words.thisComputer }}.</template>
         <template v-else>MySQL, PostgreSQL, Redis and more, one click away. They show up here, ready to open.</template>
       </p>
       <button type="button" class="dv-devcatz-btn mt-2" @click.stop="openDevCatzDownload()">

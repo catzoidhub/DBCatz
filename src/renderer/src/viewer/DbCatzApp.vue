@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection } from '@shared/types';
 import { aiOn, api, init, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
@@ -172,14 +173,14 @@ function menuAct(fn: (id: string) => void) {
           <span v-else-if="isReadOnly(t.connection)" class="dv-mode-chip is-ro" title="Read-only: writes are refused">READ-ONLY</span>
           <span v-if="t.connection" class="dv-tab-close" title="Close tab" @click.stop="closeTab(t.id)">×</span>
         </button>
-        <button class="dv-tab-add" title="New connection (⌘N)" @click="editing = null; pickTab('home')">+</button>
+        <button class="dv-tab-add" :title="`New connection (${keyLabel('mod+N')})`" @click="editing = null; pickTab('home')">+</button>
       </div>
       <button class="no-drag btn btn-ghost btn-xs mb-1.5 gap-1" :class="{ 'text-primary': running }" title="Export / import / backup jobs" @click="showJobs = !showJobs">
         <span v-if="running" class="loading loading-spinner loading-xs" />
         <svg v-else viewBox="0 0 20 20" class="size-4" fill="currentColor"><path d="M10 3a1 1 0 0 1 1 1v6.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L9 10.6V4a1 1 0 0 1 1-1ZM4 14a1 1 0 0 1 1 1v1h10v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" /></svg>
         Jobs<span v-if="jobs.length" class="badge badge-ghost badge-xs">{{ jobs.length }}</span>
       </button>
-      <button class="no-drag btn btn-ghost btn-xs btn-square relative mb-1.5" :class="{ 'btn-active': showSettings }" title="Settings (⌘,)" @click="showSettings = !showSettings">
+      <button class="no-drag btn btn-ghost btn-xs btn-square relative mb-1.5" :class="{ 'btn-active': showSettings }" :title="`Settings (${keyLabel('mod+,')})`" @click="showSettings = !showSettings">
         <span v-if="update?.status === 'available' || update?.status === 'downloaded'" class="absolute top-0.5 right-0.5 size-2 rounded-full bg-primary ring-2 ring-base-100" title="An update is ready" />
         <svg viewBox="0 0 20 20" class="size-4" fill="currentColor"><path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" /></svg>
       </button>
@@ -194,7 +195,7 @@ function menuAct(fn: (id: string) => void) {
     <DvSettings v-if="ready && showSettings" @close="showSettings = false" />
     <AskDbcatz v-if="askOpen" @close="askOpen = false" />
     <!-- Ask DBCatz: a floating button bottom-right, in reach from every screen. -->
-    <button v-if="ready && askOn && !askOpen" class="ask-fab no-drag" title="Ask DBCatz (⌘K): say what to do in plain words" aria-label="Ask DBCatz" @click="askOpen = true"><span><img :src="askMark" alt="" /></span></button>
+    <button v-if="ready && askOn && !askOpen" class="ask-fab no-drag" :title="`Ask DBCatz (${keyLabel('mod+K')}): say what to do in plain words`" aria-label="Ask DBCatz" @click="askOpen = true"><span><img :src="askMark" alt="" /></span></button>
     <DvJobs v-if="showJobs" @close="showJobs = false" />
     <DvUpdateDialog v-if="ready && updateOpen" @close="updateOpen = false" />
     <DvReportDialog v-if="ready && reportOpen" :kind="reportOpen" @close="reportOpen = null" />

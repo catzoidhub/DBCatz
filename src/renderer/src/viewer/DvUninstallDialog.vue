@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { words } from '@shared/platform';
 import { computed, onMounted, ref } from 'vue';
 import type { DvUninstallPlan } from '@shared/types';
 import { api, notify } from '../store';
@@ -69,7 +70,7 @@ async function go() {
         <label v-if="plan.shared.length" class="opt-row cursor-pointer">
           <span class="flex flex-col">
             <span class="label-caps">Also remove the shared Catzoid settings</span>
-            <span class="text-xs opacity-50">{{ plan.otherApps.length ? `Theme, AI connection and AI keys are shared with ${plan.otherApps.join(', ')}: keep them for those apps.` : 'Theme, AI connection and the AI keys in Keychain. No other Catzoid app is installed.' }}</span>
+            <span class="text-xs opacity-50">{{ plan.otherApps.length ? `Theme, AI connection and AI keys are shared with ${plan.otherApps.join(', ')}: keep them for those apps.` : `Theme, AI connection and the AI keys in ${words.secretStore}. No other Catzoid app is installed.` }}</span>
           </span>
           <input v-model="removeShared" type="checkbox" class="toggle toggle-sm toggle-warning" />
         </label>

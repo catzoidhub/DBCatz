@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { words } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DbEngine, DvConnection, DvConnectionInput, DvLayout, DvMethod, DvMode, DvOptionKey } from '@shared/types';
 import { DV_DEFAULT_OPTIONS, DV_METHOD_NAME, dvMethods, dvOptionSupport } from '@shared/types';
@@ -84,7 +85,7 @@ const sections = computed<Section[]>(() => {
   }
   const rest = all.filter((x) => !grouped.has(x.id));
   if (devcatzApp.value || rest.some((x) => x.serviceId)) out.push({ key: 'svc', title: 'DevCatz services', items: rest.filter((x) => x.serviceId), collapsed: c('svc'), empty: filter.value ? 'Nothing matches' : 'No database service yet. Create one on DevCatz’s Database page.' });
-  out.push({ key: 'saved', title: 'Saved connections', items: rest.filter((x) => !x.serviceId), collapsed: c('saved'), empty: filter.value ? 'Nothing matches' : 'Connections you set up are kept here; secrets are encrypted with the macOS Keychain.' });
+  out.push({ key: 'saved', title: 'Saved connections', items: rest.filter((x) => !x.serviceId), collapsed: c('saved'), empty: filter.value ? 'Nothing matches' : `Connections you set up are kept here; secrets are encrypted with the ${words.secretStoreFull}.` });
   return out;
 });
 function toggleSection(sec: Section) {
@@ -327,7 +328,7 @@ const MODES: { id: DvMode; name: string; hint: string; dot: string }[] = [
   { id: 'readonly', name: 'Read-only', hint: 'Only reads; the server session is read-only too.', dot: 'oklch(70% 0.13 235)' },
 ];
 const OPTION_INFO: { key: DvOptionKey; label: string; insecure?: boolean; hint: string }[] = [
-  { key: 'localInfile', label: 'Allow LOCAL_DATA_INFILE', insecure: true, hint: 'LOAD DATA LOCAL INFILE: the server may read files from this Mac.' },
+  { key: 'localInfile', label: 'Allow LOCAL_DATA_INFILE', insecure: true, hint: `LOAD DATA LOCAL INFILE: the server may read files from ${words.thisComputer}.` },
   { key: 'cleartext', label: 'Enable Cleartext plugin', insecure: true, hint: 'mysql_clear_password (LDAP / PAM users): the password travels as is, so use it with SSL.' },
   { key: 'requireSsl', label: 'Require SSL', hint: 'Encrypt the connection (MySQL ssl, PostgreSQL sslmode=require, rediss, Mongo tls, https).' },
   { key: 'getPublicKey', label: 'Get Public Key', hint: 'MySQL 8 caching_sha2_password without SSL: let the server send its RSA key.' },
@@ -812,7 +813,7 @@ async function keep(c: DvConnection) {
           <button type="button" class="btn btn-sm" :disabled="busy === 'save' || busy === 'connect'" @click="save(false)"><span v-if="busy === 'save'" class="loading loading-spinner loading-xs" />Save</button>
           <button class="btn btn-primary btn-sm" :disabled="busy === 'save' || busy === 'connect'"><span v-if="busy === 'connect'" class="loading loading-spinner loading-xs" />{{ editing ? 'Save & connect' : 'Connect' }}</button>
         </div>
-        <p v-if="editing || setup === 'manual'" class="mt-3 text-[11px] opacity-45">Kept in DBCatz’s settings on this Mac; passwords, passphrases, AWS keys and Vault tokens are encrypted with the macOS Keychain.</p>
+        <p v-if="editing || setup === 'manual'" class="mt-3 text-[11px] opacity-45">Kept in DBCatz’s settings on {{ words.thisComputer }}; passwords, passphrases, AWS keys and Vault tokens are encrypted with the {{ words.secretStoreFull }}.</p>
       </form>
     </div>
 

@@ -4,6 +4,7 @@ import type { DbEngine, DvAws, DvMethod, DvOptions, DvSsh, DvVault } from '@shar
 import { DV_DEFAULT_OPTIONS } from '@shared/types';
 import { connect, type ConnectSettings, type Driver } from './driver';
 import { awsCredentials, openTunnel, rdsAuthToken, rdsCa, regionOf, vaultCredentials, type Tunnel } from './remote';
+import { words } from '@shared/platform';
 
 /**
  * Opens one connection step by step — Vault credentials, AWS IAM token, SSH
@@ -182,7 +183,7 @@ export function friendly(e: Error & { code?: string; errno?: number; sqlMessage?
   if (code === 'ETIMEDOUT' || /timeout|timed out|did not answer/i.test(msg))
     return `No answer from ${at} within ${p.options.connectTimeout} s. A firewall, security group or VPN may block it${p.method === 'tcp' ? '; production servers are often only reachable through SSH' : ''}.`;
   if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return `The host ${p.host} cannot be found (DNS). Check the name, or connect to the VPN it lives on.`;
-  if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH') return `${at} is not reachable from this Mac (no route). Check the VPN or network.`;
+  if (code === 'EHOSTUNREACH' || code === 'ENETUNREACH') return `${at} is not reachable from ${words.thisComputer} (no route). Check the VPN or network.`;
   if (code === 'ECONNRESET' || code === 'PROTOCOL_CONNECTION_LOST') return `${at} closed the connection${p.options.requireSsl ? ' (the server may not accept SSL here)' : ' (the server may require SSL: turn on "Require SSL")'}.`;
   if (code === 'ER_ACCESS_DENIED_ERROR' || code === '28P01' || /authentication failed|Access denied|WRONGPASS|invalid password|NOAUTH|Authentication failed/i.test(msg))
     return `${p.method === 'aws-iam' ? 'AWS IAM sign-in refused (is IAM auth enabled on the instance, and does the user have rds_iam / AWSAuthenticationPlugin and an rds-db:connect policy?)' : 'Wrong user or password'}: ${msg}`;

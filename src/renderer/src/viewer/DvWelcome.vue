@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { words } from '@shared/platform';
 import { computed, onMounted, ref } from 'vue';
 import { api } from '../store';
 import CatMood from './CatMood.vue';
@@ -58,7 +59,7 @@ const privacy = () => site.value && api.openUrl(`${site.value}/docs/privacy-and-
 
         <div class="space-y-1">
           <p class="label-caps">Three things to know first</p>
-          <p class="text-xs opacity-60">No administrator password, nothing installed on your Mac. Everything here can be changed later.</p>
+          <p class="text-xs opacity-60">No administrator password, nothing installed on {{ words.thisComputer }}. Everything here can be changed later.</p>
         </div>
 
         <div class="space-y-3">
@@ -68,7 +69,7 @@ const privacy = () => site.value && api.openUrl(`${site.value}/docs/privacy-and-
                 <p class="font-medium">1 · Connect to a database</p>
                 <p class="mt-1 text-sm opacity-70">
                   By hand, over SSH, with AWS IAM or credentials from Vault — or paste a URL like <span class="font-mono">postgres://…</span>
-                  (a whole <span class="font-mono">DATABASE_URL=</span> line from .env works too). Passwords stay in macOS’s secure storage.
+                  (a whole <span class="font-mono">DATABASE_URL=</span> line from .env works too). Passwords stay in {{ words.os }}’s secure storage.
                 </p>
               </div>
               <button class="btn btn-primary btn-sm shrink-0" @click="newConnection">New connection</button>
