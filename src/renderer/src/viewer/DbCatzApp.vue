@@ -67,7 +67,14 @@ onMounted(async () => {
       settingsTab.value = 'about';
       showSettings.value = true;
     }
-    else if (c.command === 'askDbcatz') askOpen.value = askOn.value ? !askOpen.value : false;
+    else if (c.command === 'askDbcatz') {
+      // with AI (or Ask) off the menu item leads to where it is turned on, instead of doing nothing (Catzoid #35)
+      if (askOn.value) askOpen.value = !askOpen.value;
+      else {
+        settingsTab.value = 'ai';
+        showSettings.value = true;
+      }
+    }
     else if (c.command === 'navBack') back();
     else if (c.command === 'navForward') forward();
     else if (c.command === 'selectAll') selectAll(c);
