@@ -1,9 +1,8 @@
-import { app } from 'electron';
-import { execFile } from 'node:child_process';
 import { existsSync, readFileSync, statSync, watch, type FSWatcher } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { DevCatzService, DevCatzServicesFile } from '@shared/types';
+import { findCatzoidApp } from './companion';
 
 /**
  * DevCatz integration: DevCatz writes the database services it manages to
@@ -12,11 +11,10 @@ import type { DevCatzService, DevCatzServicesFile } from '@shared/types';
  * talks to DevCatz directly — the file is the whole contract.
  */
 
-export const SERVICES_FILE = process.env.DBCATZ_SERVICES_FILE || join(homedir(), 'Library', 'Application Support', 'DevCatz', 'dbcatz', 'services.json');
-const APP_PATHS = ['/Applications/DevCatz.app', join(homedir(), 'Applications', 'DevCatz.app')];
-const BUNDLE_ID = 'com.mrcatz.devcatz';
-
-const usable = (p: string | null | undefined): p is string => !!p && !p.includes('/.Trash/') && existsSync(join(p, 'Contents', 'Info.plist'));
+/** DevCatz's data folder: ~/Library/Application Support/DevCatz on a Mac, %APPDATA%\DevCatz on Windows. */
+const DEVCATZ_DATA =
+  process.platform === 'win32' ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'DevCatz') : join(homedir(), 'Library', 'Application Support', 'DevCatz');
+export const SERVICES_FILE = process.env.DBCATZ_SERVICES_FILE || join(DEVCATZ_DATA, 'dbcatz', 'services.json');
 
 export class DevCatzServices {
   private services: DevCatzService[] = [];
@@ -31,17 +29,11 @@ export class DevCatzServices {
   }
 
   /**
-   * The DevCatz app bundle wherever it lives — /Applications, ~/Applications or
-   * any other folder (a build output, Downloads): the usual places first, then
-   * the app Launch Services opens devcatz:// links with, then Spotlight by bundle id.
+   * The DevCatz app wherever it lives — /Applications or ~/Applications on a Mac, the per-user install folder on
+   * Windows, else the app that opens devcatz:// links, else (Mac) Spotlight by bundle id (companion.ts).
    */
-  static async locate(): Promise<string | null> {
-    const known = APP_PATHS.find((p) => existsSync(p));
-    if (known) return known;
-    const handler = await app.getApplicationInfoForProtocol('devcatz://db').catch(() => null);
-    if (usable(handler?.path) && /DevCatz/i.test(handler.path)) return handler.path;
-    const out = await new Promise<string>((resolve) => execFile('mdfind', [`kMDItemCFBundleIdentifier == '${BUNDLE_ID}'`], { timeout: 10_000 }, (_e, stdout) => resolve(String(stdout ?? ''))));
-    return out.split('\n').map((l) => l.trim()).find(usable) ?? null;
+  static locate(): Promise<string | null> {
+    return findCatzoidApp('DevCatz', 'devcatz', 'com.mrcatz.devcatz');
   }
 
   /** DevCatz is on this Mac: its app was found, or it has written a services file (even an empty one). */

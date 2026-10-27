@@ -3,6 +3,7 @@ import { execFile, spawn } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { findCatzoidApp } from './companion';
 import type { DvUninstallPlan } from '@shared/types';
 import { readShared, SHARED_DIR } from './shared';
 import { words } from '@shared/platform';
@@ -43,10 +44,9 @@ async function keychainHas(service: string, account?: string): Promise<boolean> 
   return (await run('/usr/bin/security', ['find-generic-password', '-s', service, ...(account ? ['-a', account] : [])])).ok;
 }
 
+/** Another Catzoid app on this computer (its usual folder, its link handler, or Spotlight — companion.ts). */
 async function installed(id: string, name: string): Promise<boolean> {
-  if ([join('/Applications', `${name}.app`), join(home, 'Applications', `${name}.app`)].some(existsSync)) return true;
-  const r = await run('mdfind', [`kMDItemCFBundleIdentifier == '${id}'`]);
-  return r.out.split('\n').some((p) => p.trim().endsWith('.app') && !p.includes('/.Trash/'));
+  return (await findCatzoidApp(name, name.toLowerCase(), id)) !== null;
 }
 
 function brew(): string | null {

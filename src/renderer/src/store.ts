@@ -28,10 +28,19 @@ export async function attempt<T>(fn: () => Promise<T>, success?: string): Promis
 /** The Settings page's values (config.json, through the main process). */
 export const settings = ref<DbCatzSettings | null>(null);
 export const showSettings = ref(false);
-/** DevCatz's download for this computer from the Catzoid site: `<shared site address>/download/devcatz/<platform>`. */
+/**
+ * DevCatz's download for this computer from the Catzoid site: `<shared site address>/download/devcatz/<platform>`
+ * (mac-arm64, mac-x64, win-x64). No build for this computer → say so and open DevCatz's page, never another
+ * platform's file (Catzoid family rule).
+ */
 export async function openDevCatzDownload(): Promise<void> {
   const info = await api.appInfo().catch(() => null);
-  await api.openUrl(`${info?.site ?? 'https://catzoid.com'}/download/devcatz/${info?.platform ?? 'mac-arm64'}`);
+  const site = info?.site ?? 'https://catzoid.com';
+  if (!info?.platform) {
+    notify('info', 'There is no DevCatz build for this computer yet.');
+    return void api.openUrl(`${site}/devcatz`);
+  }
+  await api.openUrl(`${site}/download/devcatz/${info.platform}`);
 }
 /** The Settings tab to show (Ask DBCatz's open-settings sets it). */
 export const settingsTab = ref<'appearance' | 'ai' | 'updates' | 'about'>('appearance');

@@ -1,5 +1,4 @@
 import { app, dialog, ipcMain, shell } from 'electron';
-import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
@@ -12,6 +11,7 @@ import { Updater } from './updater';
 import { Reporter } from './reporter';
 import { uninstallPlan, uninstallRun } from './uninstall';
 import { writeBridge } from './bridge';
+import { openCatzoidApp, platformId } from './companion';
 
 /**
  * DBCatz — a database viewer for MySQL / MariaDB, PostgreSQL, SQLite, Redis /
@@ -93,7 +93,7 @@ function api(): DbCatzApi {
   return {
     appInfo: async () => {
       const devcatzPath = await DevCatzServices.locate();
-      return { version: app.getVersion(), devcatz: devcatzPath !== null || (await devcatz.installed()), devcatzPath, site: siteBase(), platform: `${process.platform === 'win32' ? 'win' : 'mac'}-${process.arch}` };
+      return { version: app.getVersion(), devcatz: devcatzPath !== null || (await devcatz.installed()), devcatzPath, site: siteBase(), platform: platformId() ?? '' };
     },
     aboutInfo: async () => ({
       version: app.getVersion(),
@@ -154,10 +154,8 @@ function api(): DbCatzApi {
     openInDevCatz: async (serviceId) => {
       const path = await DevCatzServices.locate();
       if (!path) return false;
-      const link = `devcatz://db/${encodeURIComponent(serviceId)}`;
-      // `open -a` hands the link to this very copy, whichever app Launch Services picked for devcatz://.
-      const ok = await new Promise<boolean>((resolve) => execFile('open', ['-a', path, link], { timeout: 30_000 }, (e) => resolve(!e)));
-      if (!ok) await shell.openExternal(link);
+      // That very copy at the service: `open -a` on a Mac, the .exe with the link on Windows.
+      await openCatzoidApp(path, `devcatz://db/${encodeURIComponent(serviceId)}`);
       return true;
     },
     ...viewer.routes(),

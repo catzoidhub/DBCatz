@@ -694,7 +694,7 @@ export interface DbCatzApi {
   /**
    * App version; whether DevCatz has been on this Mac (its app or its services file), its app's path (null when the
    * app is gone, even if its services file is left behind), the shared Catzoid site address and this computer's
-   * platform as the site's download links name it (mac-arm64, mac-x64, win-x64).
+   * platform as the site's download links name it (mac-arm64, mac-x64, win-x64; '' when there is no build for it).
    */
   appInfo(): Promise<{ version: string; devcatz: boolean; devcatzPath: string | null; site: string; platform: string }>;
   /** Version, platform and the shared site address, for Settings → About. */

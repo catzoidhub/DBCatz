@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import type { DvReport, DvReportKind, DvReportSettings, ReportShot } from '@shared/types';
 import { store } from './store';
 import { siteBase } from './shared';
+import { platformId } from './companion';
 import { maskSecrets } from './ai';
 import { installId, updateChannel } from './updater';
 
@@ -63,7 +64,7 @@ export function scrub(text: string): string {
     .replace(/`[^`\n]{0,400}`/g, '`…`');
 }
 
-const platform = () => `${process.platform === 'win32' ? 'win' : 'mac'}-${process.arch}`;
+
 function base(): Omit<DvReport, 'type' | 'message'> {
   return {
     app: 'dbcatz',
@@ -72,7 +73,7 @@ function base(): Omit<DvReport, 'type' | 'message'> {
     os: process.platform === 'darwin' ? 'macos' : process.platform,
     osVersion: process.getSystemVersion(),
     arch: process.arch,
-    platform: platform(),
+    platform: platformId() ?? undefined,
     installId: installId(),
   };
 }

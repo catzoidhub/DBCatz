@@ -4,6 +4,7 @@ import { autoUpdater, CancellationToken, type ProgressInfo, type UpdateInfo } fr
 import type { DvUpdateChannel, DvUpdateSettings, DvUpdateState } from '@shared/types';
 import { store } from './store';
 import { siteBase } from './shared';
+import { platformId } from './companion';
 
 /**
  * In-app updates (Catzoid family TODO #54) with electron-updater. The feed is the Catzoid site's
@@ -45,7 +46,7 @@ const save = (patch: Partial<Stored>) => store.setExtra(KEY, { ...stored(), ...p
 export const installId = () => stored().installId;
 export const updateChannel = (): DvUpdateChannel => stored().channel;
 
-const platform = () => `${process.platform === 'win32' ? 'win' : 'mac'}-${process.arch}`;
+
 /** Release notes from the feed: a string, or one entry per version in between. */
 function notesOf(info: UpdateInfo): string {
   const n = info.releaseNotes;
@@ -85,7 +86,7 @@ export class Updater {
   }
 
   get(): DvUpdateState {
-    return { ...this.state, settings: this.settings(), downloadUrl: `${siteBase()}/download/dbcatz/${platform()}` };
+    return { ...this.state, settings: this.settings(), downloadUrl: platformId() ? `${siteBase()}/download/dbcatz/${platformId()}` : `${siteBase()}/dbcatz` };
   }
 
   private set(patch: Partial<DvUpdateState>): void {
@@ -153,7 +154,9 @@ export class Updater {
       this.set({ status: 'none', version: undefined, lastChecked });
       return this.get();
     }
-    const size = info.files?.find((f) => f.url.endsWith('.zip'))?.size ?? info.files?.[0]?.size;
+    // The file electron-updater will fetch for this computer: Windows the Setup .exe, a Mac the zip of its own chip.
+    const mine = (u: string) => (process.platform === 'win32' ? u.endsWith('.exe') : u.endsWith('.zip') && (process.arch === 'arm64') === u.includes('arm64'));
+    const size = info.files?.find((f) => mine(f.url))?.size;
     this.set({ status: 'available', version: info.version, notes: notesOf(info), size, releaseDate: info.releaseDate, lastChecked, source: this.source });
     if (!manual && stored().skipped !== info.version) this.notify('available');
     return this.get();
