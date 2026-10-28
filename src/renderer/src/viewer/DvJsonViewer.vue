@@ -3,15 +3,49 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { keyLabel } from '@shared/platform';
 import { notify } from '../store';
 import { renderPretty } from './pretty';
+import DvJsonEditor from './DvJsonEditor.vue';
 
 /**
- * A JSON cell, read-only and easy to read: indented 2 spaces and coloured like a code editor (keys, strings, numbers,
+ * A JSON cell, easy to read: indented 2 spaces and coloured like a code editor (keys, strings, numbers,
  * true / false / null), the same look as DialCatz's Pretty view, in light and dark, with line numbers and Find
- * (⌘F: matches highlighted, n of m, ⏎ / ⇧⏎ to step through). Copy takes the formatted JSON; Edit (when the cell can
- * be edited) opens the grid's usual cell editor.
+ * (⌘F: matches highlighted, n of m, ⏎ / ⇧⏎ to step through). Copy takes the formatted JSON. Edit (when the cell can
+ * be edited) edits it in the same pretty form (DvJsonEditor: colours, line numbers, Find & Replace, checked as typed);
+ * Save hands the text to the grid, which writes it like any cell edit (Production asks first).
  */
-const props = defineProps<{ value: unknown; column: string; type?: string; row: number; editable?: boolean }>();
-const emit = defineEmits<{ close: []; edit: [] }>();
+const props = defineProps<{ value: unknown; column: string; type?: string; row: number; editable?: boolean; busy?: boolean }>();
+const emit = defineEmits<{ close: []; save: [text: string] }>();
+
+// ---- editing in the pretty form
+const editingJson = ref(false);
+const draft = ref('');
+const confirmDiscard = ref(false);
+const editor = ref<InstanceType<typeof DvJsonEditor> | null>(null);
+const dirty = computed(() => editingJson.value && draft.value !== pretty.value);
+function startEditing() {
+  draft.value = pretty.value;
+  confirmDiscard.value = false;
+  editingJson.value = true;
+}
+function stopEditing() {
+  if (dirty.value && !confirmDiscard.value) {
+    confirmDiscard.value = true;
+    return;
+  }
+  editingJson.value = false;
+  confirmDiscard.value = false;
+}
+const draftError = computed(() => {
+  try {
+    JSON.parse(draft.value);
+    return false;
+  } catch {
+    return true;
+  }
+});
+function save() {
+  if (draftError.value || props.busy) return;
+  emit('save', draft.value);
+}
 
 /** The value as JSON: objects / arrays as they are (MongoDB), text parsed (json / jsonb / JSON columns, JSON in text). */
 const parsed = computed<{ ok: true; value: unknown } | { ok: false; error: string }>(() => {
@@ -103,6 +137,8 @@ async function copy() {
   notify('success', 'JSON copied');
 }
 const onKey = (e: KeyboardEvent) => {
+  // While editing, DvJsonEditor owns the keys (Find & Replace, ⌘S, Esc to cancel).
+  if (editingJson.value) return;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
     e.preventDefault();
     findInput.value?.focus();
@@ -129,8 +165,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
         <span v-if="type" class="badge badge-ghost badge-xs shrink-0 font-mono">{{ type }}</span>
         <span v-if="size" class="shrink-0 text-[11px] opacity-50">{{ size }}</span>
         <span class="flex-1" />
+        <span v-if="editingJson" class="badge badge-primary badge-sm shrink-0">Editing</span>
         <span class="shrink-0 text-[11px] opacity-50">row {{ row }}</span>
       </div>
+      <DvJsonEditor v-if="editingJson" ref="editor" v-model="draft" :busy="busy" @save="save" @cancel="stopEditing" />
+      <template v-else>
       <div class="flex items-center gap-2 border-b border-base-300/60 px-5 py-2">
         <label class="input input-sm min-w-0 flex-1 gap-2">
           <svg viewBox="0 0 20 20" class="size-3.5 shrink-0 opacity-50" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 3.38 9.84l3.14 3.14a.75.75 0 1 0 1.06-1.06l-3.14-3.14A5.5 5.5 0 0 0 9 3.5ZM5 9a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd" /></svg>
@@ -148,14 +187,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true));
       <div ref="body" :key="drawKey" class="dv-json dv-json-lines min-h-0 flex-1">
         <div v-for="(l, i) in lines" :key="i" class="dv-jl"><span class="dv-jl-n">{{ i + 1 }}</span><span class="dv-jl-c" v-html="l || ' '" /></div>
       </div>
-      <div class="flex items-center gap-2 border-t border-base-300/60 px-5 pt-3 pb-4">
+      </template>
+      <div v-if="editingJson" class="flex items-center gap-2 border-t border-base-300/60 px-5 pt-3 pb-4">
+        <button class="btn btn-sm" :disabled="draftError" title="Indent 2 spaces again" @click="editor?.format()">Format</button>
+        <button class="btn btn-ghost btn-sm" :title="`Find & Replace (${keyLabel('mod+F')})`" @click="editor?.openFind(true)">Find &amp; Replace</button>
+        <span class="flex-1" />
+        <button class="btn btn-ghost btn-sm" :class="{ 'text-error': confirmDiscard }" :disabled="busy" @click="stopEditing">{{ confirmDiscard ? 'Discard changes' : 'Cancel' }}</button>
+        <button class="btn btn-primary btn-sm" :disabled="draftError || busy || !dirty" :title="`Save (${keyLabel('mod+S')})`" @click="save"><span v-if="busy" class="loading loading-spinner loading-xs" />Save</button>
+      </div>
+      <div v-else class="flex items-center gap-2 border-t border-base-300/60 px-5 pt-3 pb-4">
         <button class="btn btn-sm" @click="copy">Copy</button>
         <span class="text-[11px] opacity-50">{{ lines.length }} {{ lines.length === 1 ? 'line' : 'lines' }}</span>
         <span class="flex-1" />
-        <button v-if="editable" class="btn btn-ghost btn-sm" @click="emit('edit')">Edit</button>
+        <button v-if="editable && parsed.ok" class="btn btn-ghost btn-sm" @click="startEditing">Edit</button>
         <button class="btn btn-primary btn-sm" @click="emit('close')">Close</button>
       </div>
     </div>
-    <div class="modal-backdrop" @click="emit('close')" />
+    <div class="modal-backdrop" @click="!editingJson && emit('close')" />
   </dialog>
 </template>

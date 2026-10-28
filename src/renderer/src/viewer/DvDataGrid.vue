@@ -353,11 +353,23 @@ function isJsonCell(v: unknown, col: string): boolean {
 function openJson(r: number, c: number, e: MouseEvent) {
   viewing.value = { row: r, col: c, el: (e.currentTarget as HTMLElement).closest('td')! };
 }
-/** Edit from the viewer: the usual cell editor, placed at the cell. */
-function editFromViewer() {
-  const v = viewing.value!;
-  viewing.value = null;
-  startEdit(v.row, v.col, { currentTarget: v.el } as unknown as MouseEvent);
+/**
+ * Save from the viewer's pretty editor, through the usual cell update (Production asks first). A value stored on one
+ * line (text columns holding compact JSON) is saved on one line again; otherwise the edited text as it is.
+ */
+async function saveJson(textValue: string) {
+  const v = viewing.value;
+  if (!v || !result.value) return;
+  if (readOnly.value) return notify('info', 'This connection is read-only');
+  const old = result.value.rows[v.row][v.col];
+  const compact = old === null || typeof old === 'object' || !String(old).includes('\n');
+  const value = compact ? JSON.stringify(JSON.parse(textValue)) : textValue;
+  editing.value = { row: v.row, col: v.col, value };
+  await commitEdit();
+  if (result.value.rows[v.row][v.col] === value) {
+    viewing.value = null;
+    notify('success', `${result.value.columns[v.col]} saved`);
+  }
 }
 
 /** Cell text: NULL dimmed, booleans spelled out, long text cut. */
@@ -544,7 +556,8 @@ function display(v: unknown, col: string): string {
       :type="typeOf(result.columns[viewing.col])"
       :row="page * PAGE + viewing.row + 1"
       :editable="editable && !readOnly"
-      @edit="editFromViewer"
+      :busy="busy"
+      @save="saveJson"
       @close="viewing = null"
     />
     <DvInsertForm v-if="inserting" :table="table" :columns="insertColumns" :row-word="W.row" :busy="busy" @save="commitInsert" @cancel="inserting = false" />

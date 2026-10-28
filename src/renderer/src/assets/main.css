@@ -2200,3 +2200,26 @@ mark.dv-find.is-current {
   color: var(--color-warning-content);
   box-shadow: 0 0 0 1px var(--color-warning);
 }
+
+/* DvJsonEditor: line numbers beside the coloured textarea (scrolled together). */
+.dv-jsonedit {
+  display: flex;
+  min-height: 18rem;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 12.5px;
+  line-height: 1.55;
+  tab-size: 2;
+}
+.dv-jsonedit-gutter {
+  flex-shrink: 0;
+  width: 3.4rem;
+  padding: 0.75rem 0.9rem 0.75rem 0.5rem;
+  overflow: hidden;
+  text-align: right;
+  color: oklch(from var(--color-base-content) l c h / 0.32);
+  border-right: 1px solid oklch(from var(--color-base-content) l c h / 0.08);
+  user-select: none;
+}
+.dv-jsonedit-layer {
+  padding: 0.75rem 1rem 0.75rem 0.75rem;
+}
