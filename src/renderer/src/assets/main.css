@@ -2132,3 +2132,71 @@ button.dv-card-head:hover {
   width: 8.5rem;
   flex-shrink: 0;
 }
+
+/* A JSON cell's { } button (DvJsonViewer): on the right, shown on hover. */
+.dv-grid td.has-json {
+  position: relative;
+  padding-right: 2.1rem;
+}
+.dv-json-open {
+  position: absolute;
+  top: 50%;
+  right: 0.3rem;
+  transform: translateY(-50%);
+  padding: 0 0.3rem;
+  height: 1.15rem;
+  border-radius: 0.35rem;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--primary-ink);
+  background: oklch(from var(--color-primary) l c h / 0.14);
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.dv-grid tr:hover td.has-json .dv-json-open,
+.dv-json-open:focus-visible {
+  opacity: 1;
+}
+.dv-json-open:hover {
+  color: var(--color-primary-content);
+  background: var(--color-primary);
+}
+
+/* DvJsonViewer: line numbers in a gutter that stays put, and Find's matches. */
+.dv-json-lines {
+  padding: 0.6rem 0;
+}
+.dv-jl {
+  display: flex;
+  min-width: max-content;
+}
+.dv-jl-n {
+  position: sticky;
+  left: 0;
+  flex-shrink: 0;
+  width: 3.4rem;
+  padding: 0 0.9rem 0 0.5rem;
+  margin-right: 0.75rem;
+  text-align: right;
+  color: oklch(from var(--color-base-content) l c h / 0.32);
+  background: var(--color-base-100);
+  border-right: 1px solid oklch(from var(--color-base-content) l c h / 0.08);
+  user-select: none;
+}
+.dv-jl-c {
+  padding-right: 1rem;
+}
+.dv-jl:hover .dv-jl-n {
+  color: oklch(from var(--color-base-content) l c h / 0.6);
+}
+mark.dv-find {
+  color: inherit;
+  border-radius: 0.2rem;
+  background: oklch(from var(--color-warning) l c h / 0.35);
+}
+mark.dv-find.is-current {
+  background: var(--color-warning);
+  color: var(--color-warning-content);
+  box-shadow: 0 0 0 1px var(--color-warning);
+}

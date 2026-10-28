@@ -7,6 +7,7 @@ import ConfirmDialog from '../components/ConfirmDialog.vue';
 import DvCellEditor from './DvCellEditor.vue';
 import DvPrompt from './DvPrompt.vue';
 import DvInsertForm from './DvInsertForm.vue';
+import DvJsonViewer from './DvJsonViewer.vue';
 import { editorFor } from './coltypes';
 import { confirmProdWrite, fmtMs, fmtNum, isDoc, isReadOnly, logActivity, words } from './viewer';
 import CatMood from './CatMood.vue';
@@ -339,6 +340,26 @@ async function doDelete() {
   }
 }
 
+// ---- JSON cells: a { } button opens the value formatted and coloured (DvJsonViewer); double-click still edits.
+const viewing = ref<{ row: number; col: number; el: HTMLElement } | null>(null);
+/** json / jsonb / JSON columns, MongoDB objects and arrays, and text that looks like a JSON object or array. */
+function isJsonCell(v: unknown, col: string): boolean {
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'object') return true;
+  if (editorFor(typeOf(col)).kind === 'json') return true;
+  const s = String(v).trim();
+  return s.length > 1 && ((s[0] === '{' && s.endsWith('}')) || (s[0] === '[' && s.endsWith(']')));
+}
+function openJson(r: number, c: number, e: MouseEvent) {
+  viewing.value = { row: r, col: c, el: (e.currentTarget as HTMLElement).closest('td')! };
+}
+/** Edit from the viewer: the usual cell editor, placed at the cell. */
+function editFromViewer() {
+  const v = viewing.value!;
+  viewing.value = null;
+  startEdit(v.row, v.col, { currentTarget: v.el } as unknown as MouseEvent);
+}
+
 /** Cell text: NULL dimmed, booleans spelled out, long text cut. */
 function display(v: unknown, col: string): string {
   if (v === null) return 'NULL';
@@ -440,7 +461,7 @@ function display(v: unknown, col: string): string {
               v-for="ci in view"
               :key="ci"
               :style="widthOf(result.columns[ci])"
-              :class="{ 'is-null': row[ci] === null, 'is-editing': editing?.row === ri && editing.col === ci, 'is-fk': row[ci] !== null && fkOf.has(result.columns[ci]) }"
+              :class="{ 'is-null': row[ci] === null, 'is-editing': editing?.row === ri && editing.col === ci, 'is-fk': row[ci] !== null && fkOf.has(result.columns[ci]), 'has-json': isJsonCell(row[ci], result.columns[ci]) }"
               @click="editing || toggleRow(ri, $event)"
               @dblclick="startEdit(ri, ci, $event)"
             >
@@ -453,7 +474,14 @@ function display(v: unknown, col: string): string {
                 @dblclick.stop
               >
                 <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.64l-3.22-3.22a.75.75 0 1 1 1.06-1.06l4.5 4.5a.75.75 0 0 1 0 1.06l-4.5 4.5a.75.75 0 1 1-1.06-1.06l3.22-3.22H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd" /></svg>
-              </button>{{ display(row[ci], result.columns[ci]) }}
+              </button>{{ display(row[ci], result.columns[ci]) }}<button
+                v-if="isJsonCell(row[ci], result.columns[ci])"
+                type="button"
+                class="dv-json-open"
+                title="View as formatted JSON"
+                @click.stop="openJson(ri, ci, $event)"
+                @dblclick.stop
+              >{ }</button>
             </td>
           </tr>
           <tr v-if="!result.rows.length">
@@ -509,6 +537,16 @@ function display(v: unknown, col: string): string {
       </template>
     </Teleport>
 
+    <DvJsonViewer
+      v-if="viewing && result"
+      :value="result.rows[viewing.row][viewing.col]"
+      :column="result.columns[viewing.col]"
+      :type="typeOf(result.columns[viewing.col])"
+      :row="page * PAGE + viewing.row + 1"
+      :editable="editable && !readOnly"
+      @edit="editFromViewer"
+      @close="viewing = null"
+    />
     <DvInsertForm v-if="inserting" :table="table" :columns="insertColumns" :row-word="W.row" :busy="busy" @save="commitInsert" @cancel="inserting = false" />
     <DvPrompt v-if="naming" title="Save filter" label="Name" :initial="activeFilter?.name ?? ''" placeholder="e.g. Active customers" confirm="Save" :hint="`${doc ? 'Filter' : 'WHERE'} ${where}`" @ok="saveFilter" @cancel="naming = false" />
     <ConfirmDialog v-if="confirmDelete" :title="`Delete ${selected.size} ${selected.size === 1 ? W.row : W.rows}?`" :text="`They are removed from ${table} right away; there is no undo.`" confirm="Delete" tone="error" :busy="busy" @ok="doDelete" @cancel="confirmDelete = false" />
