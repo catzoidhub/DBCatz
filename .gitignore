@@ -4,3 +4,4 @@ dist/
 dist-quick/
 .DS_Store
 *.log
+dist-win/
