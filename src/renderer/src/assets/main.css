@@ -2229,3 +2229,9 @@ html.is-win .dv-top {
   padding-left: 0.75rem;
   padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.75rem);
 }
+/* Jobs and Settings sit on the middle line of the Windows caption buttons (minimize / maximize / close), not on the
+   tabs' baseline as beside the Mac traffic lights. */
+html.is-win .dv-top-btn {
+  align-self: center;
+  margin-bottom: 0;
+}

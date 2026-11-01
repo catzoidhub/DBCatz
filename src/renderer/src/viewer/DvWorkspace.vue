@@ -643,15 +643,14 @@ async function openService(serviceId: string) {
         </template>
       </div>
 
-      <div v-if="!error && !connecting && !disconnected" class="flex items-center gap-1 border-t border-base-300/60 px-3 py-2">
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" :class="{ 'btn-active': mode === 'query' }" :title="kv ? `Run commands (${keyLabel('mod+T')})` : `Write a query (${keyLabel('mod+T')})`" @click="openQuery">
+      <div v-if="!error && !connecting && !disconnected" class="flex items-center gap-0.5 border-t border-base-300/60 px-2 py-2">
+        <button class="btn btn-ghost btn-xs min-w-0 flex-1 gap-1 px-1" :class="{ 'btn-active': mode === 'query' }" :title="kv ? `Run commands (${keyLabel('mod+T')})` : `Write a query (${keyLabel('mod+T')})`" @click="openQuery">
           <svg viewBox="0 0 20 20" class="size-3.5" fill="currentColor"><path d="M7.3 5.3a1 1 0 0 1 1.4 0l4 4a1 1 0 0 1 0 1.4l-4 4a1 1 0 0 1-1.4-1.4L10.6 10 7.3 6.7a1 1 0 0 1 0-1.4Z" /></svg>{{ kv ? 'Command' : 'Query' }}
         </button>
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" :class="{ 'btn-active': mode === 'logs' }" :title="`Server log and DBCatz activity (${keyLabel('mod+L')})`" @click="mode = 'logs'">Logs</button>
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" :title="`Export… (${keyLabel('mod+E')})`" @click="dialog = { kind: 'export', tables: table ? [table] : [] }">Export</button>
-        <button class="btn btn-ghost btn-xs flex-1 gap-1" :title="`Import… (${keyLabel('mod+I')})`" @click="dialog = { kind: 'import' }">Import</button>
-        <span class="mx-0.5 h-4 w-px shrink-0 bg-base-300" />
-        <button class="btn btn-ghost btn-xs btn-square shrink-0" :title="`Refresh (${keyLabel('mod+R')})`" @click="refreshAll">↻</button>
+        <button class="btn btn-ghost btn-xs min-w-0 flex-1 gap-1 px-1" :class="{ 'btn-active': mode === 'logs' }" :title="`Server log and DBCatz activity (${keyLabel('mod+L')})`" @click="mode = 'logs'">Logs</button>
+        <button class="btn btn-ghost btn-xs min-w-0 flex-1 gap-1 px-1" :title="`Export… (${keyLabel('mod+E')})`" @click="dialog = { kind: 'export', tables: table ? [table] : [] }">Export</button>
+        <button class="btn btn-ghost btn-xs min-w-0 flex-1 gap-1 px-1" :title="`Import… (${keyLabel('mod+I')})`" @click="dialog = { kind: 'import' }">Import</button>
+        <button class="btn btn-ghost btn-xs btn-square ml-0.5 shrink-0" :title="`Refresh (${keyLabel('mod+R')})`" @click="refreshAll">↻</button>
       </div>
     </aside>
 
