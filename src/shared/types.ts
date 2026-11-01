@@ -4,7 +4,7 @@
  * in step with it by hand.
  */
 
-import { keyLabel } from './platform';
+import { currentOS, keyLabel, type OS } from './platform';
 
 export type DbEngine = 'mysql' | 'mariadb' | 'postgresql' | 'redis' | 'valkey' | 'mongodb' | 'elasticsearch' | 'sqlite';
 
@@ -135,7 +135,7 @@ export const DV_KEYVALUE: DvEngine[] = ['redis', 'valkey'];
 
 /** How DBCatz reaches a server. */
 export type DvMethod = 'tcp' | 'socket' | 'ssh' | 'aws-iam' | 'vault';
-export const DV_METHOD_NAME: Record<DvMethod, string> = { tcp: 'TCP/IP', socket: 'Socket', ssh: 'SSH', 'aws-iam': 'AWS IAM', vault: 'Vault' };
+export const DV_METHOD_NAME: Record<DvMethod, string> = { tcp: 'TCP/IP', socket: currentOS === 'windows' ? 'Named pipe' : 'Socket', ssh: 'SSH', 'aws-iam': 'AWS IAM', vault: 'Vault' };
 
 /** Connection options (the MySQL-specific ones are ignored by other engines). */
 export interface DvOptions {
@@ -198,12 +198,13 @@ export function dvOptionSupport(engine: DbEngine, method: DvMethod): Record<DvOp
   }
   return { localInfile: mysql ? true : notMysql, cleartext: mysql ? true : notMysql, requireSsl: engine === 'sqlite' ? only('SQLite is a file') : true, getPublicKey: mysql ? true : notMysql };
 }
-/** Methods an engine can use. */
-export function dvMethods(engine: DbEngine): DvMethod[] {
+/** Methods an engine can use. On Windows the local "socket" is MySQL / MariaDB's named pipe; the others have none there. */
+export function dvMethods(engine: DbEngine, os: OS = currentOS): DvMethod[] {
   if (engine === 'sqlite') return [];
-  if (engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql') return ['tcp', 'socket', 'ssh', 'aws-iam', 'vault'];
+  const local: DvMethod[] = os !== 'windows' || engine === 'mysql' || engine === 'mariadb' ? ['socket'] : [];
+  if (engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql') return ['tcp', ...local, 'ssh', 'aws-iam', 'vault'];
   if (engine === 'elasticsearch') return ['tcp', 'ssh', 'vault'];
-  return ['tcp', 'socket', 'ssh', 'vault'];
+  return ['tcp', ...local, 'ssh', 'vault'];
 }
 
 /** Progress of a connection attempt (test or connect), for the window. */

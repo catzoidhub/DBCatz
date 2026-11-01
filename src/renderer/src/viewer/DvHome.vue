@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { words } from '@shared/platform';
+import { currentOS, words } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DbEngine, DvConnection, DvConnectionInput, DvLayout, DvMethod, DvMode, DvOptionKey } from '@shared/types';
 import { DV_DEFAULT_OPTIONS, DV_METHOD_NAME, dvMethods, dvOptionSupport } from '@shared/types';
@@ -315,7 +315,7 @@ const support = computed(() => dvOptionSupport(form.value.engine, form.value.met
 const sqlTz = computed(() => form.value.engine === 'mysql' || form.value.engine === 'mariadb' || form.value.engine === 'postgresql');
 const m = computed(() => form.value.method);
 watch(m, (v) => {
-  if (v === 'socket' && !form.value.socket) form.value.socket = form.value.engine === 'postgresql' ? '/tmp' : form.value.engine === 'mysql' || form.value.engine === 'mariadb' ? '/tmp/mysql.sock' : form.value.engine === 'mongodb' ? `/tmp/mongodb-${form.value.port}.sock` : '/tmp/redis.sock';
+  if (v === 'socket' && !form.value.socket) form.value.socket = currentOS === 'windows' ? '\\\\.\\pipe\\MySQL' : form.value.engine === 'postgresql' ? '/tmp' : form.value.engine === 'mysql' || form.value.engine === 'mariadb' ? '/tmp/mysql.sock' : form.value.engine === 'mongodb' ? `/tmp/mongodb-${form.value.port}.sock` : '/tmp/redis.sock';
   if (v === 'ssh' && (!form.value.host || form.value.host === 'localhost')) form.value.host = '127.0.0.1';
   if (v === 'aws-iam') form.value.options.requireSsl = true;
   testToken.value = '';
@@ -670,7 +670,7 @@ async function keep(c: DvConnection) {
                   <span class="dv-label">{{ form.ssh.auth === 'key' ? 'Passphrase' : 'Password' }}</span>
                   <input v-model="form.sshSecret" :type="show ? 'text' : 'password'" class="input input-sm w-full font-mono" :placeholder="editing?.hasSshSecret && form.sshSecret === null ? '•••• (kept)' : form.ssh.auth === 'key' ? 'if any' : ''" autocomplete="new-password" @focus="form.sshSecret === null && (form.sshSecret = '')" />
                 </label>
-                <p v-else class="col-span-2 self-end pb-2 text-[11px] opacity-55">Keys from ssh-agent</p>
+                <p v-else class="col-span-2 self-end pb-2 text-[11px] opacity-55">Keys from {{ currentOS === 'windows' ? 'the OpenSSH agent' : 'ssh-agent' }}</p>
                 <label v-if="form.ssh.auth === 'key'" class="col-span-6 block">
                   <span class="dv-label">Private key</span>
                   <div class="join w-full">
@@ -714,8 +714,8 @@ async function keep(c: DvConnection) {
             <div class="dv-card-body">
               <div v-if="m === 'socket'" class="grid grid-cols-6 gap-3">
                 <label :class="form.engine === 'postgresql' ? 'col-span-4' : 'col-span-6'" class="block">
-                  <span class="dv-label">Socket {{ form.engine === 'postgresql' ? 'folder or file' : 'file' }}</span>
-                  <input v-model="form.socket" class="input input-sm w-full font-mono" :placeholder="form.engine === 'postgresql' ? '/tmp or /var/run/postgresql' : '/tmp/mysql.sock'" required spellcheck="false" />
+                  <span class="dv-label">{{ currentOS === 'windows' ? 'Pipe name' : `Socket ${form.engine === 'postgresql' ? 'folder or file' : 'file'}` }}</span>
+                  <input v-model="form.socket" class="input input-sm w-full font-mono" :placeholder="currentOS === 'windows' ? '\\\\.\\pipe\\MySQL' : form.engine === 'postgresql' ? '/tmp or /var/run/postgresql' : '/tmp/mysql.sock'" required spellcheck="false" />
                 </label>
                 <label v-if="form.engine === 'postgresql'" class="col-span-2 block"><span class="dv-label">Port</span><input v-model.number="form.port" type="number" class="input input-sm w-full font-mono" title="PostgreSQL names its socket after the port" /></label>
               </div>

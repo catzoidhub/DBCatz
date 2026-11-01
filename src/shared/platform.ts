@@ -44,7 +44,7 @@ export const words = wordsFor(currentOS);
 /** A shortcut label: 'mod+shift+P' reads ⌘⇧P on a Mac and Ctrl+Shift+P elsewhere. */
 export function keyLabel(combo: string, os: OS = currentOS): string {
   const mac = os === 'mac';
-  const names: Record<string, [string, string]> = { mod: ['⌘', 'Ctrl'], shift: ['⇧', 'Shift'], alt: ['⌥', 'Alt'], ctrl: ['⌃', 'Ctrl'] };
+  const names: Record<string, [string, string]> = { mod: ['⌘', 'Ctrl'], shift: ['⇧', 'Shift'], alt: ['⌥', 'Alt'], ctrl: ['⌃', 'Ctrl'], '⏎': ['⏎', 'Enter'], '⌫': ['⌫', 'Backspace'] };
   const parts = combo.split('+').map((p) => { const n = names[p.toLowerCase()]; return n ? n[mac ? 0 : 1] : p; });
   return parts.join(mac ? '' : '+');
 }
