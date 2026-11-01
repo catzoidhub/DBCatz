@@ -150,7 +150,9 @@ function viewerMenu(): MenuItemConstructorOptions[] {
   return [
     {
       label: app.name,
-      submenu: [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'services' }, sep, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, sep, { role: 'quit' }],
+      submenu: isWin
+        ? [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'quit', label: 'Exit' }]
+        : [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'services' }, sep, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, sep, { role: 'quit' }],
     },
     {
       label: 'File',
@@ -204,7 +206,9 @@ function viewerMenu(): MenuItemConstructorOptions[] {
     { label: 'Go', submenu: [item('Back', 'navBack', 'CmdOrCtrl+['), item('Forward', 'navForward', 'CmdOrCtrl+]')] },
     {
       role: 'windowMenu',
-      submenu: [{ role: 'minimize' }, { role: 'zoom' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab'), sep, { role: 'front' }],
+      submenu: isWin
+        ? [{ role: 'minimize' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab')]
+        : [{ role: 'minimize' }, { role: 'zoom' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab'), sep, { role: 'front' }],
     },
     { role: 'help', submenu: [item('Report a Bug…', 'reportBug'), item('Send Feedback…', 'sendFeedback')] },
   ];
@@ -218,6 +222,40 @@ export function setUpdateLabel(label: string): void {
   updateLabel = label;
   Menu.setApplicationMenu(Menu.buildFromTemplate(viewerMenu()));
 }
+/**
+ * Windows: the window has no menu bar (titleBarStyle 'hidden' for the title bar overlay), and Electron registers no
+ * menu accelerators for such a window. The header's ☰ button opens the same menu here, and the window sends its
+ * unhandled shortcuts to menuKey(), so every menu command and shortcut works as on the Mac.
+ */
+export function appMenuPopup(x: number, y: number): void {
+  const w = viewerWindow();
+  if (w) Menu.getApplicationMenu()?.popup({ window: w, x: Math.round(x), y: Math.round(y) });
+}
+
+/** "CmdOrCtrl+Shift+N" → "ctrl+shift+n" (the form the window builds from a key press). */
+const normal = (acc: string) =>
+  acc.split('+').map((p) => p.toLowerCase()).map((p) => (p === 'cmdorctrl' || p === 'commandorcontrol' || p === 'control' ? 'ctrl' : p === 'return' ? 'enter' : p === 'option' ? 'alt' : p)).sort((a, b) => order(a) - order(b) || 0).join('+');
+const order = (p: string) => ['ctrl', 'alt', 'shift'].indexOf(p) + 1 || 9;
+
+/** The menu's own items with a shortcut (not roles: text editing keys stay the page's). */
+function menuItems(): { key: string; item: Electron.MenuItem }[] {
+  const out: { key: string; item: Electron.MenuItem }[] = [];
+  const walk = (m: Electron.Menu) =>
+    m.items.forEach((i) => {
+      if (i.submenu) walk(i.submenu);
+      else if (i.accelerator && !i.role && i.visible !== false) out.push({ key: normal(String(i.accelerator)), item: i });
+    });
+  const m = Menu.getApplicationMenu();
+  if (m) walk(m);
+  return out;
+}
+export const menuShortcuts = (): string[] => [...new Set(menuItems().map((x) => x.key))];
+export function menuKey(key: string): void {
+  const w = viewerWindow();
+  const hit = menuItems().find((x) => x.key === key && x.item.enabled);
+  if (w && hit) hit.item.click(undefined, w, w.webContents);
+}
+
 export function applyMenu(viewer: boolean): void {
   if (viewerActive === viewer && Menu.getApplicationMenu()) return;
   void viewer;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { keyLabel } from '@shared/platform';
+import { currentOS, keyLabel } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection } from '@shared/types';
 import { aiOn, api, init, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
@@ -81,6 +81,10 @@ onMounted(async () => {
     else dispatch(c);
   });
   window.addEventListener('mouseup', onMouseNav);
+  if (isWin) {
+    menuKeys = new Set(await api.dvMenuShortcuts());
+    window.addEventListener('keydown', onMenuKey);
+  }
   ready.value = true;
   changed();
   if (props.connId) open(props.connId, props.db || undefined, { table: props.table, col: props.col, val: props.val });
@@ -146,7 +150,32 @@ function onMouseNav(e: MouseEvent) {
   else return;
   e.preventDefault();
 }
-onBeforeUnmount(() => window.removeEventListener('mouseup', onMouseNav));
+onBeforeUnmount(() => {
+  window.removeEventListener('mouseup', onMouseNav);
+  window.removeEventListener('keydown', onMenuKey);
+});
+
+/**
+ * Windows has no menu bar here (the title bar overlay), and Electron gives such a window no menu shortcuts: the ☰
+ * button opens the app menu, and a shortcut the page left alone (as the Mac menu gets it after the page) runs its
+ * menu item.
+ */
+const isWin = currentOS === 'windows';
+let menuKeys = new Set<string>();
+const CODE_KEY: Record<string, string> = { Comma: ',', Period: '.', Slash: '/', BracketLeft: '[', BracketRight: ']', Backspace: 'backspace', Delete: 'delete', Enter: 'enter', NumpadEnter: 'enter', Tab: 'tab', Escape: 'escape' };
+function onMenuKey(e: KeyboardEvent) {
+  if (e.defaultPrevented || !(e.ctrlKey || e.altKey) || e.metaKey) return;
+  const key = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : /^(Digit|Numpad)\d$/.test(e.code) ? e.code.slice(-1) : /^F\d+$/.test(e.code) ? e.code.toLowerCase() : CODE_KEY[e.code];
+  if (!key) return;
+  const combo = [e.ctrlKey && 'ctrl', e.altKey && 'alt', e.shiftKey && 'shift', key].filter(Boolean).join('+');
+  if (!menuKeys.has(combo)) return;
+  e.preventDefault();
+  void api.dvMenuKey(combo);
+}
+function openAppMenu(e: MouseEvent) {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  void api.dvAppMenu(r.left, r.bottom + 4);
+}
 function pickTab(id: string) {
   active.value = id;
   showSettings.value = false;
@@ -182,6 +211,9 @@ function menuAct(fn: (id: string) => void) {
         </button>
         <button class="dv-tab-add" :title="`New connection (${keyLabel('mod+N')})`" @click="editing = null; pickTab('home')">+</button>
       </div>
+      <button v-if="isWin" class="dv-top-btn no-drag btn btn-ghost btn-xs btn-square" title="Menu: every DBCatz command and its shortcut" @click="openAppMenu">
+        <svg viewBox="0 0 20 20" class="size-4" fill="currentColor"><path d="M3 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm0 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Zm1 4a1 1 0 1 0 0 2h12a1 1 0 1 0 0-2H4Z" /></svg>
+      </button>
       <button class="dv-top-btn no-drag btn btn-ghost btn-xs mb-1.5 gap-1" :class="{ 'text-primary': running }" title="Export / import / backup jobs" @click="showJobs = !showJobs">
         <span v-if="running" class="loading loading-spinner loading-xs" />
         <svg v-else viewBox="0 0 20 20" class="size-4" fill="currentColor"><path d="M10 3a1 1 0 0 1 1 1v6.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L9 10.6V4a1 1 0 0 1 1-1ZM4 14a1 1 0 0 1 1 1v1h10v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" /></svg>

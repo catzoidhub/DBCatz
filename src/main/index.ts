@@ -2,7 +2,7 @@ import { app, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
-import { applyMenu, openViewer, setUpdateLabel, tableMenu, viewerWindow } from './dbviewer/window';
+import { applyMenu, appMenuPopup, menuKey, menuShortcuts, openViewer, setUpdateLabel, tableMenu, viewerWindow } from './dbviewer/window';
 import { DevCatzServices } from './devcatz';
 import { AskAi } from './ai';
 import { applySettings, migrateToShared, setAiKey, setSettings, settings } from './settings';
@@ -186,6 +186,9 @@ function api(): DbCatzApi {
     },
     dvReveal: async (path) => shell.showItemInFolder(path),
     dvTableMenu: async (table, kind, selection) => tableMenu(table, kind, selection),
+    dvAppMenu: async (x, y) => appMenuPopup(x, y),
+    dvMenuShortcuts: async () => menuShortcuts(),
+    dvMenuKey: async (key) => menuKey(key),
   };
 }
 
