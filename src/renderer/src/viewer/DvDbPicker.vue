@@ -168,7 +168,7 @@ function parts(name: string): [string, string, string] {
             </template>
           </div>
         </div>
-        <div class="dv-suggest-foot"><span><kbd>↑</kbd><kbd>↓</kbd>move</span><span><kbd>⏎</kbd>open</span><span><kbd>esc</kbd>close</span><span class="flex-1" /><span>★ stars</span></div>
+        <div class="dv-suggest-foot"><span><kbd>↑</kbd><kbd>↓</kbd>move</span><span><kbd>{{ keyLabel('⏎') }}</kbd>open</span><span><kbd>esc</kbd>close</span><span class="flex-1" /><span>★ stars</span></div>
       </div>
     </template>
   </div>

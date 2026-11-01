@@ -48,7 +48,8 @@ export function openTunnel(ssh: DvSsh, secret: string, dstHost: string, dstPort:
     const cfg: ConnectConfig = { host: ssh.host, port: ssh.port || 22, username: ssh.user, readyTimeout: timeoutMs, keepaliveInterval: 15_000 };
     if (ssh.auth === 'password') cfg.password = secret;
     else if (ssh.auth === 'agent') {
-      cfg.agent = process.env.SSH_AUTH_SOCK;
+      // Windows: the OpenSSH Authentication Agent service listens on a named pipe, SSH_AUTH_SOCK is rarely set.
+      cfg.agent = process.env.SSH_AUTH_SOCK || (process.platform === 'win32' ? '\\\\.\\pipe\\openssh-ssh-agent' : undefined);
       if (!cfg.agent) return fail(new Error('SSH agent: SSH_AUTH_SOCK is not set (start ssh-agent and add your key), or choose a key file'));
     } else {
       const path = expand(ssh.keyPath);
@@ -100,7 +101,7 @@ export function sshKeys(): string[] {
   const dir = join(homedir(), '.ssh');
   try {
     const files = readdirSync(dir);
-    return files.filter((f) => !f.endsWith('.pub') && (files.includes(`${f}.pub`) || /^id_/.test(f)) && !/^(known_hosts|config|authorized_keys)/.test(f)).map((f) => `~/.ssh/${f}`);
+    return files.filter((f) => !f.endsWith('.pub') && (files.includes(`${f}.pub`) || /^id_/.test(f)) && !/^(known_hosts|config|authorized_keys)/.test(f)).map((f) => (process.platform === 'win32' ? join(dir, f) : `~/.ssh/${f}`));
   } catch {
     return [];
   }
@@ -149,7 +150,7 @@ export function awsCredentials(aws: DvAws, secret: string): AwsCreds & { region?
   if (merged.sso_session || merged.sso_start_url || merged.credential_process || merged.role_arn)
     throw new Error(`AWS profile ${profile} uses SSO / a role / credential_process: run "aws configure export-credentials --profile ${profile}" style tools are not read here; use an access key or a profile with static keys`);
   if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) return { accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY, sessionToken: process.env.AWS_SESSION_TOKEN };
-  throw new Error(aws.profile ? `AWS profile ${aws.profile} has no access key in ~/.aws/credentials` : 'No AWS credentials: enter an access key, or pick a profile from ~/.aws');
+  throw new Error(aws.profile ? `AWS profile ${aws.profile} has no access key in ${join(homedir(), '.aws', 'credentials')}` : `No AWS credentials: enter an access key, or pick a profile from ${join(homedir(), '.aws')}`);
 }
 
 /** mydb.abc123.eu-west-1.rds.amazonaws.com → eu-west-1. */

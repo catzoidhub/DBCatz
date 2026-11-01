@@ -36,6 +36,10 @@ dmg:
   sign: true
   title: DBCatz ${version}
   artifactName: DBCatz-${version}-${arch}.${ext}
+  # Drawn from scripts/dmg/background.svg (1× and @2x PNG; electron-builder joins them into a Retina TIFF).
+  background: resources/dmg/background.png
+  iconSize: 112
+  iconTextSize: 13
   contents:
     - { x: 150, y: 190, type: file }
     - { x: 450, y: 190, type: link, path: /Applications }
@@ -45,5 +49,30 @@ publish:
   provider: github
   owner: catzoidhub
   repo: DBCatz
+win:
+  icon: resources/icon.png # ≥ 256 × 256; electron-builder makes the .ico
+  target:
+    - target: nsis
+      arch: [x64]
+  # Sets the .exe's icon and version info; with no certificate configured nothing is signed here.
+  signAndEditExecutable: true
+nsis:
+  oneClick: false
+  # Per user: no administrator prompt, and in-app updates work without UAC.
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  # What the Catzoid site's catalog matches (catalog.go winX64).
+  artifactName: ${productName}-Setup-${version}.${ext}
+  # The DBCatz look (drawn from scripts/installer/*.svg) and the Welcome / Shortcuts pages (resources/installer/installer.nsh).
+  installerSidebar: resources/installer/sidebar.bmp
+  uninstallerSidebar: resources/installer/sidebar.bmp
+  installerHeader: resources/installer/header.bmp
+  include: resources/installer/installer.nsh
+  shortcutName: DBCatz
+  # Asked on the Shortcuts page instead (installer.nsh); the Start menu entry is always made.
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  uninstallDisplayName: ${productName}
+
 # No native modules to compile: ssh2's optional cpu-features / crypto bindings fall back to pure JS.
 npmRebuild: false

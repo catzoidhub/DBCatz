@@ -175,7 +175,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
                 <button v-for="m in THEMES" :key="m.value" class="btn btn-sm join-item" :class="{ 'btn-active btn-primary': s.theme === m.value }" :title="m.hint" @click="saveSettings({ theme: m.value })">{{ m.label }}</button>
               </div>
             </div>
-            <p class="text-xs opacity-60">Auto follows macOS (System Settings → Appearance). All Catzoid apps use the same theme.</p>
+            <p class="text-xs opacity-60">Auto follows {{ words.os }} ({{ words.appearanceSettings }}). All Catzoid apps use the same theme.</p>
           </div>
         </div>
         <div v-if="tab === 'appearance'" class="card">

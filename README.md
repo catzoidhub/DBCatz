@@ -9,14 +9,14 @@
   <a href="https://catzoid.com/community">Community</a>
 </p>
 
-A database client for macOS: MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch in one window, a tab per connection — local servers, through SSH, on AWS with IAM, or with credentials from Vault. Production mode asks before every write, read-only stays read-only, and an optional AI writes the query while you press Run.
+A database client for macOS and Windows: MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch in one window, a tab per connection — local servers, through SSH, on AWS with IAM, or with credentials from Vault. Production mode asks before every write, read-only stays read-only, and an optional AI writes the query while you press Run.
 
 Part of [Catzoid](https://catzoid.com) — free, open-source developer tools with nine lives. All cats, no catch: no
 account, no Pro tier, nothing locked behind a payment.
 
 ## What it does
 
-- **Connect** by hand, over SSH, with AWS IAM or Vault — or paste a URL (`postgres://…`, a whole `DATABASE_URL=` line works too). Passwords stay in the macOS Keychain.
+- **Connect** by hand, over SSH, with AWS IAM or Vault — or paste a URL (`postgres://…`, a whole `DATABASE_URL=` line works too). Passwords stay in the macOS Keychain, or on Windows encrypted for your account.
 - **Browse and edit** — data grid with filters, structure, indexes, export and import, a query editor with history.
 - **Production safety** — Production and Read-only modes per connection, typed confirmations for risky statements.
 - **AI, optional** — Ask in plain words; only structure is sent, never your rows unless you allow samples.
@@ -33,8 +33,11 @@ brew tap catzoidhub/catz && brew trust catzoidhub/catz
 brew install --cask dbcatz
 ```
 
-The app is signed and notarized by Apple and updates itself (Settings → About → Check for Updates). Windows builds
-are on the way.
+The app is signed and notarized by Apple and updates itself (Settings → About → Check for Updates).
+
+Windows 10 / 11 (x64): `DBCatz-Setup-<version>.exe` from the same page or the
+[latest release](https://github.com/catzoidhub/DBCatz/releases/latest). It installs for your account only, no
+administrator rights needed.
 
 ## Build from source
 
@@ -46,6 +49,13 @@ bun run package      # a signed DMG in dist/ (notarized when a notarytool profil
 ```
 
 Found a bug? Use **Help → Report a Bug…** in the app, or [open an issue](https://github.com/catzoidhub/DBCatz/issues).
+
+## Code signing
+
+Windows: free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). The installer is built by GitHub Actions from this repository and each
+signing request is approved by hand. macOS builds are signed with a Developer ID and notarized by Apple. Team roles,
+privacy and the full policy: [catzoid.com/legal/code-signing](https://catzoid.com/legal/code-signing).
 
 ## Licence
 

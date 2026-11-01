@@ -265,7 +265,7 @@ defineExpose({ error, format, openFind });
           <input ref="findInput" v-model="query" class="grow font-mono text-xs" placeholder="Find" spellcheck="false" autocomplete="off" @keydown="findKeys" />
           <span v-if="counter" class="shrink-0 text-[11px]" :class="matches.length ? 'opacity-55' : 'text-warning'">{{ counter }}</span>
         </label>
-        <button class="btn btn-ghost btn-sm btn-square" :disabled="!matches.length" title="Previous (⇧⏎)" @click="prev">
+        <button class="btn btn-ghost btn-sm btn-square" :disabled="!matches.length" :title="`Previous (${keyLabel('shift+⏎')})`" @click="prev">
           <svg viewBox="0 0 20 20" class="size-4" fill="currentColor"><path fill-rule="evenodd" d="M14.77 12.79a.75.75 0 0 1-1.06-.02L10 8.83l-3.71 3.94a.75.75 0 1 1-1.08-1.04l4.25-4.5a.75.75 0 0 1 1.08 0l4.25 4.5a.75.75 0 0 1-.02 1.06Z" clip-rule="evenodd" /></svg>
         </button>
         <button class="btn btn-ghost btn-sm btn-square" :disabled="!matches.length" title="Next (⏎)" @click="next">

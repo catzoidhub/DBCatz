@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { keyLabel } from '@shared/platform';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { highlight, type Language } from './highlight';
 import type { Completion, Suggestion } from './complete';
@@ -261,7 +262,7 @@ const KIND_LABEL: Record<Suggestion['kind'], string> = { keyword: 'Keyword', tab
       </ul>
       <div class="dv-suggest-foot">
         <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-        <span><kbd>⏎</kbd><kbd>→</kbd> insert</span>
+        <span><kbd>{{ keyLabel('⏎') }}</kbd><kbd>→</kbd> insert</span>
         <span><kbd>esc</kbd> close</span>
       </div>
     </div>

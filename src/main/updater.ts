@@ -146,6 +146,9 @@ export class Updater {
     }
     const lastChecked = Date.now();
     save({ lastChecked });
+    // No Windows build on the feed yet (latest.yml missing, as while the installer waits for signing): nothing newer
+    // for this copy, not a failure.
+    if (error && process.platform === 'win32' && /\b404\b/.test(error)) error = '';
     if (error) {
       this.set({ status: 'error', error: `Could not reach the update feed: ${error}`, lastChecked });
       return this.get();

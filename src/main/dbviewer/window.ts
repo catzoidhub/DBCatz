@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, nativeTheme, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
+import { isWin } from '../platform';
 
 /**
  * The DBCatz window: one window with a tab per connection. Opening a
@@ -73,6 +74,15 @@ export interface ViewerTarget {
   val?: string;
 }
 
+/**
+ * Windows: the minimize / maximize / close buttons on a neutral block in the theme's colours (on the page's own
+ * background they vanish in dark mode), as tall as the tab strip; repainted when the theme changes. As DevCatz.
+ */
+function titleBarOverlay(): { color: string; symbolColor: string; height: number } {
+  return nativeTheme.shouldUseDarkColors ? { color: '#2b2d34', symbolColor: '#e5e7eb', height: 52 } : { color: '#e7e8ec', symbolColor: '#1f2937', height: 52 };
+}
+if (isWin) nativeTheme.on('updated', () => win && !win.isDestroyed() && win.setTitleBarOverlay(titleBarOverlay()));
+
 export function openViewer(connId: string | null, db?: string, target: ViewerTarget = {}): void {
   if (win && !win.isDestroyed()) {
     win.show();
@@ -86,10 +96,19 @@ export function openViewer(connId: string | null, db?: string, target: ViewerTar
     minWidth: 860,
     minHeight: 520,
     title: 'DBCatz',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: '#00000000',
-    vibrancy: 'sidebar',
+    ...(isWin
+      ? {
+          // Windows: the tab strip is the title bar; the system buttons sit over its right end (Catzoid #76).
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: titleBarOverlay(),
+          backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1f24' : '#f6f7f9',
+        }
+      : {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 16, y: 18 },
+          backgroundColor: '#00000000',
+          vibrancy: 'sidebar' as const,
+        }),
     show: false,
     webPreferences: { preload, sandbox: false, contextIsolation: true },
   });
