@@ -2222,3 +2222,10 @@ mark.dv-find.is-current {
 .dv-jsonedit-layer {
   padding: 0.75rem 1rem 0.75rem 0.75rem;
 }
+
+/* Windows (Catzoid #76): no traffic lights on the left; the minimize / maximize / close buttons sit over the right end
+   of the tab strip (titleBarOverlay), so the strip stops before them — env() gives their width. */
+html.is-win .dv-top {
+  padding-left: 0.75rem;
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.75rem);
+}

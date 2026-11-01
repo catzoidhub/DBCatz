@@ -674,7 +674,7 @@ async function keep(c: DvConnection) {
                 <label v-if="form.ssh.auth === 'key'" class="col-span-6 block">
                   <span class="dv-label">Private key</span>
                   <div class="join w-full">
-                    <input v-model="form.ssh.keyPath" class="input input-sm join-item w-full font-mono text-xs" list="dv-ssh-keys" placeholder="~/.ssh/id_ed25519" spellcheck="false" />
+                    <input v-model="form.ssh.keyPath" class="input input-sm join-item w-full font-mono text-xs" list="dv-ssh-keys" :placeholder="`${words.home}.ssh${words.sep}id_ed25519`" spellcheck="false" />
                     <button type="button" class="btn btn-sm join-item" @click="pickKey">Choose…</button>
                   </div>
                   <datalist id="dv-ssh-keys"><option v-for="k in sshKeys" :key="k" :value="k" /></datalist>

@@ -45,5 +45,24 @@ publish:
   provider: github
   owner: catzoidhub
   repo: DBCatz
+win:
+  icon: resources/icon.png # ≥ 256 × 256; electron-builder makes the .ico
+  target:
+    - target: nsis
+      arch: [x64]
+  # Sets the .exe's icon and version info; with no certificate configured nothing is signed here.
+  signAndEditExecutable: true
+nsis:
+  oneClick: false
+  # Per user: no administrator prompt, and in-app updates work without UAC.
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  # What the Catzoid site's catalog matches (catalog.go winX64).
+  artifactName: ${productName}-Setup-${version}.${ext}
+  shortcutName: DBCatz
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  uninstallDisplayName: ${productName}
+
 # No native modules to compile: ssh2's optional cpu-features / crypto bindings fall back to pure JS.
 npmRebuild: false

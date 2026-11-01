@@ -169,7 +169,7 @@ function menuAct(fn: (id: string) => void) {
 <template>
   <div class="relative flex h-full flex-col bg-base-100 text-sm">
     <!-- Title bar: window drag area with the connection tabs. -->
-    <header class="drag flex h-[52px] shrink-0 items-end gap-1 border-b border-base-300/60 pr-4 pl-[88px]">
+    <header class="dv-top drag flex h-[52px] shrink-0 items-end gap-1 border-b border-base-300/60 pr-4 pl-[88px]">
       <div class="no-drag flex min-w-0 flex-1 items-end gap-1 overflow-x-auto pb-0 [scrollbar-width:none]">
         <button v-for="t in tabs" :key="t.id" class="dv-tab" :class="{ 'is-active': active === t.id }" :style="t.connection?.color ? { '--tab-accent': t.connection.color } : {}" :title="t.connection ? `${t.connection.name} — right-click to duplicate or close` : 'Connections'" @click="pickTab(t.id)" @auxclick.middle.prevent="closeTab(t.id)" @contextmenu.prevent="openTabMenu($event, t.id)">
           <span v-if="t.connection" class="dv-tab-accent" />

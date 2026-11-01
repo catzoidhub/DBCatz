@@ -1,9 +1,10 @@
 import { app } from 'electron';
 import { execFile, spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { DvAiProvider, Theme } from '@shared/types';
+import { isWin } from './platform';
 
 /**
  * Settings shared by the Catzoid apps (DevCatz, DBCatz, later DialCatz): the theme and the AI connection
@@ -18,12 +19,15 @@ import type { DvAiProvider, Theme } from '@shared/types';
  *     "ai": { "provider": "anthropic", "models": { "<provider>": "<model>" }, "baseUrls": { … }, "keys": ["<provider>", …] },
  *     "updatedBy": "devcatz" | "dbcatz", "updatedAt": "<ISO time>" }
  *   Keychain: generic password, service "Catzoid AI", account = provider id, password = the API key.
+ *   Windows: %APPDATA%\Catzoid\shared.json; the keys DPAPI-encrypted for the user in Catzoid\keys\<provider>.dpapi
+ *   (PowerShell's ConvertFrom-SecureString), as DevCatz does.
  *   On / off switches (AI enabled, features) stay in each app.
  *
  * CATZOID_SHARED_DIR and CATZOID_KEYCHAIN (a keychain file) point both elsewhere, for tests.
  */
 
-export const SHARED_DIR = process.env.CATZOID_SHARED_DIR || join(homedir(), 'Library', 'Application Support', 'Catzoid');
+export const SHARED_DIR =
+  process.env.CATZOID_SHARED_DIR || (isWin ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Catzoid') : join(homedir(), 'Library', 'Application Support', 'Catzoid'));
 const FILE = join(SHARED_DIR, 'shared.json');
 const SERVICE = 'Catzoid AI';
 const ME = 'dbcatz';
@@ -52,7 +56,7 @@ let cache: Shared | null = null;
 export function readShared(): Shared {
   if (cache) return cache;
   try {
-    const v = JSON.parse(readFileSync(FILE, 'utf8')) as Shared;
+    const v = JSON.parse(readFileSync(FILE, 'utf8').replace(/^\uFEFF/, '')) as Shared;
     cache = v && typeof v === 'object' ? { ...v, version: 1 } : { version: 1 };
   } catch {
     cache = { version: 1 };
@@ -128,10 +132,55 @@ function security(args: string[]): Promise<{ code: number; stdout: string }> {
 
 const keyCache = new Map<DvAiProvider, { at: number; key: string }>();
 
+/**
+ * Windows: the key encrypted with DPAPI for the current user in Catzoid\keys\<provider>.dpapi, so every Catzoid app
+ * of the same user reads it, as the Keychain item on macOS (the same files as DevCatz). The key goes in through stdin,
+ * never the command line.
+ */
+const keyFile = (provider: DvAiProvider) => join(SHARED_DIR, 'keys', `${provider}.dpapi`);
+const psQuote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+function powershell(script: string, input = ''): Promise<{ code: number; out: string }> {
+  return new Promise((resolve) => {
+    const p = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    let out = '';
+    p.stdout.on('data', (d) => (out += d));
+    p.on('error', () => resolve({ code: 1, out: '' }));
+    p.on('close', (c) => resolve({ code: c ?? 1, out }));
+    p.stdin.end(input);
+  });
+}
+async function winKey(provider: DvAiProvider): Promise<string> {
+  const file = keyFile(provider);
+  if (!existsSync(file)) return '';
+  const r = await powershell(
+    `$s = ConvertTo-SecureString (Get-Content -Raw -Path ${psQuote(file)}).Trim(); ` +
+      '[Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))',
+  );
+  return r.code === 0 ? r.out.trim() : '';
+}
+async function setWinKey(provider: DvAiProvider, key: string): Promise<void> {
+  const file = keyFile(provider);
+  if (!key) {
+    rmSync(file, { force: true });
+    return;
+  }
+  mkdirSync(join(file, '..'), { recursive: true });
+  const r = await powershell(
+    `$k = [Console]::In.ReadToEnd().Trim(); ConvertTo-SecureString $k -AsPlainText -Force | ConvertFrom-SecureString | Set-Content -NoNewline -Path ${psQuote(file)}`,
+    key,
+  );
+  if (r.code !== 0) throw new Error('Windows could not store the key');
+}
+
 /** The provider's API key from the shared Keychain item ('' when there is none). Cached for a minute. */
 export async function sharedKey(provider: DvAiProvider): Promise<string> {
   const hit = keyCache.get(provider);
   if (hit && Date.now() - hit.at < 60_000) return hit.key;
+  if (isWin) {
+    const key = await winKey(provider);
+    keyCache.set(provider, { at: Date.now(), key });
+    return key;
+  }
   const r = await security(['find-generic-password', '-s', SERVICE, '-a', provider, '-w', ...KEYCHAIN]);
   const key = r.code === 0 ? r.stdout.replace(/\n$/, '') : '';
   keyCache.set(provider, { at: Date.now(), key });
@@ -141,7 +190,10 @@ export async function sharedKey(provider: DvAiProvider): Promise<string> {
 /** Saves (or with '' removes) a provider's key in the shared Keychain item and lists it in shared.json. */
 export async function setSharedKey(provider: DvAiProvider, key: string): Promise<void> {
   const k = key.trim();
-  if (!k) {
+  if (isWin) {
+    if (/["\\\n\r]/.test(k)) throw new Error('That key has characters an API key does not have');
+    await setWinKey(provider, k);
+  } else if (!k) {
     await security(['delete-generic-password', '-s', SERVICE, '-a', provider, ...KEYCHAIN]);
   } else {
     if (/["\\\n\r]/.test(k)) throw new Error('That key has characters an API key does not have');
