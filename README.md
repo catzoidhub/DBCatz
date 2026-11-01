@@ -37,7 +37,7 @@ The app is signed and notarized by Apple and updates itself (Settings → About 
 
 Windows 10 / 11 (x64): `DBCatz-Setup-<version>.exe` from the same page or the
 [latest release](https://github.com/catzoidhub/DBCatz/releases/latest). It installs for your account only, no
-administrator rights needed.
+administrator rights needed. It is not code-signed yet (see Code signing below).
 
 ## Build from source
 
@@ -52,10 +52,12 @@ Found a bug? Use **Help → Report a Bug…** in the app, or [open an issue](htt
 
 ## Code signing
 
-Windows: free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
-[SignPath Foundation](https://signpath.org). The installer is built by GitHub Actions from this repository and each
-signing request is approved by hand. macOS builds are signed with a Developer ID and notarized by Apple. Team roles,
-privacy and the full policy: [catzoid.com/legal/code-signing](https://catzoid.com/legal/code-signing).
+macOS builds are signed with a Developer ID and notarized by Apple. **The Windows installer is not code-signed yet**:
+the SignPath Foundation, which signs open-source projects for free, asks for a project with more history and public
+use than DBCatz has today, and paid certificates are out of reach for now. Windows SmartScreen therefore warns when you
+open the installer: choose **More info → Run anyway**. The installer is built by GitHub Actions from this repository,
+so what you run is this source. Stars, issues and pull requests help DBCatz qualify for free signing later. Policy:
+[catzoid.com/legal/code-signing](https://catzoid.com/legal/code-signing).
 
 ## Licence
 
