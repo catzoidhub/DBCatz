@@ -132,7 +132,7 @@ export async function runAsk(a: DvAskAction): Promise<string> {
     case 'open-devcatz': {
       if (!conn.serviceId) throw new Error(`${conn.name} is not a DevCatz or DoCatz service`);
       if (conn.serviceApp === 'DoCatz') {
-        if (!(await api.openInDoCatz())) throw new Error(`DoCatz is not installed on ${words.thisComputer}`);
+        if (!(await api.openInDoCatz(conn.serviceId))) throw new Error(`DoCatz is not installed on ${words.thisComputer}`);
         return `DoCatz opened${conn.running ? '' : `: start ${conn.project || conn.name} there`}`;
       }
       const found = await api.openInDevCatz(conn.serviceId);

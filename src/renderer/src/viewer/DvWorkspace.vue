@@ -581,7 +581,7 @@ const tableIcon = (t: DvTable) => (t.type === 'view' ? 'M2 10s3-5 8-5 8 5 8 5-3 
 /** Open in DevCatz / DoCatz on a service's error screen; without the DevCatz app, its download page instead. */
 async function openService(serviceId: string) {
   if (c.value.serviceApp === 'DoCatz') {
-    if (!(await api.openInDoCatz())) notify('info', `DoCatz is not installed on ${platformWords.thisComputer}`);
+    if (!(await api.openInDoCatz(serviceId))) notify('info', `DoCatz is not installed on ${platformWords.thisComputer}`);
     return;
   }
   if (await api.openInDevCatz(serviceId)) return;

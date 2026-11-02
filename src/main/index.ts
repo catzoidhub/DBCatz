@@ -166,10 +166,12 @@ function api(): DbCatzApi {
       await openCatzoidApp(path, `devcatz://db/${encodeURIComponent(serviceId)}`);
       return true;
     },
-    openInDoCatz: async () => {
+    openInDoCatz: async (serviceId) => {
       const path = await docatz.locate();
       if (!path) return false;
-      await openCatzoidApp(path, 'docatz://open');
+      // The container's page; an older DoCatz writes no container name, so its window.
+      const name = docatz.list().find((s) => s.id === serviceId)?.container;
+      await openCatzoidApp(path, name && /^[\w.-]{1,200}$/.test(name) ? `docatz://container/${name}` : 'docatz://open');
       return true;
     },
     ...viewer.routes(),

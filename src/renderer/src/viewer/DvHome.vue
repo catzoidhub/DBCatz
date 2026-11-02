@@ -220,7 +220,7 @@ function connMenu(e: MouseEvent, c: DvConnection) {
     ...layout.value.groups.map((g) => ({ label: g.name, checked: g.name === current, action: () => setGroup(c.id, g.name) })),
     { label: 'New group…', action: () => (groupDialog.value = { mode: 'new', id: c.id }) },
     ...(current ? [{ label: `Remove from “${current}”`, action: () => setGroup(c.id, null) }] : []),
-    ...(c.serviceApp === 'DoCatz' ? [{ label: 'Open in DoCatz', separator: true, action: () => void api.openInDoCatz() }] : []),
+    ...(c.serviceApp === 'DoCatz' ? [{ label: 'Open in DoCatz', separator: true, action: () => void api.openInDoCatz(c.serviceId!) }] : []),
     ...(!c.serviceId ? [{ label: 'Edit…', action: () => edit(c), separator: true }, { label: 'Delete…', danger: true, action: () => (removing.value = c) }] : []),
   ]);
 }

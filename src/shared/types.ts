@@ -27,6 +27,8 @@ export interface DevCatzService {
   /** DoCatz: the compose project and service the container belongs to. */
   project?: string;
   service?: string;
+  /** DoCatz: the container's name (docatz://container/<name>); missing with an older DoCatz. */
+  container?: string;
 }
 export interface DevCatzServicesFile {
   version: 1;
@@ -762,8 +764,8 @@ export interface DbCatzApi {
   pickFile(title: string): Promise<string | null>;
   /** Opens DevCatz at a database service (devcatz://db/<id>) when it is installed. */
   openInDevCatz(serviceId: string): Promise<boolean>;
-  /** Opens DoCatz (where its containers are started) when it is installed. */
-  openInDoCatz(): Promise<boolean>;
+  /** Opens DoCatz at a service's container (docatz://container/<name>), or its window, when it is installed. */
+  openInDoCatz(serviceId: string): Promise<boolean>;
   // Database viewer
   dvConnections(): Promise<DvConnection[]>;
   dvSaveConnection(input: DvConnectionInput): Promise<DvConnection>;
