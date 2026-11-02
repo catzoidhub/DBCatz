@@ -9,9 +9,10 @@ import { editorFor } from './coltypes';
  * New row: one field per column with the same typed editor as editing a cell
  * (ENUM dropdown, BOOLEAN, date / time pickers, numbers, JSON …), and for each
  * field what to send — the column's Default (left out of the INSERT), NULL, or
- * a Value (an empty value is an empty string, not NULL).
+ * a Value (an empty value is an empty string, not NULL). Documents (MongoDB, Elasticsearch) have no fixed columns:
+ * `freeFields` adds a "+ Field" row for fields no document has yet.
  */
-const props = defineProps<{ table: string; columns: DvColumn[]; rowWord: string; busy?: boolean }>();
+const props = defineProps<{ table: string; columns: DvColumn[]; rowWord: string; busy?: boolean; freeFields?: boolean }>();
 const emit = defineEmits<{ save: [values: Record<string, unknown>]; cancel: [] }>();
 
 type Mode = 'default' | 'null' | 'value';
@@ -21,6 +22,22 @@ const canDefault = (c: DvColumn) => !required(c);
 const fields = reactive(
   Object.fromEntries(props.columns.map((c) => [c.name, { mode: (required(c) ? 'value' : 'default') as Mode, value: '' as string | null }])),
 );
+const cols = ref<DvColumn[]>([...props.columns]);
+const newField = ref('');
+const newFieldError = computed(() => {
+  const n = newField.value.trim();
+  if (!n) return '';
+  if (cols.value.some((c) => c.name === n)) return `${n} is already in the form`;
+  if (n.startsWith('$') || n.includes('.')) return 'A field name cannot start with $ or contain a dot';
+  return '';
+});
+function addField() {
+  const name = newField.value.trim();
+  if (!name || newFieldError.value) return;
+  cols.value.push({ name, type: '', nullable: true, default: null, key: false, autoIncrement: false, comment: null, extra: null });
+  fields[name] = { mode: 'value', value: '' };
+  newField.value = '';
+}
 const defaultText = (c: DvColumn) => (c.autoIncrement ? 'auto' : c.default !== null && c.default !== undefined && c.default !== '' ? c.default : c.nullable ? 'NULL' : '');
 const kindLabel = (c: DvColumn) => {
   const k = c.options?.length ? 'enum' : editorFor(c.type).kind;
@@ -35,7 +52,7 @@ function onEdit(name: string, v: string | null) {
 const filled = computed(() => Object.values(fields).filter((f) => f.mode !== 'default').length);
 function save() {
   const values: Record<string, unknown> = {};
-  for (const c of props.columns) {
+  for (const c of cols.value) {
     const f = fields[c.name];
     if (f.mode === 'null') values[c.name] = null;
     else if (f.mode === 'value') values[c.name] = f.value ?? '';
@@ -57,7 +74,7 @@ onMounted(() => first.value?.querySelector<HTMLElement>('input, select, textarea
       </div>
 
       <div class="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-3">
-        <div v-for="(c, i) in columns" :key="c.name" :ref="i === 0 ? (el) => (first = el as HTMLElement) : undefined" class="dv-ins-field" :class="{ 'is-off': fields[c.name].mode !== 'value' }">
+        <div v-for="(c, i) in cols" :key="c.name" :ref="i === 0 ? (el) => (first = el as HTMLElement) : undefined" class="dv-ins-field" :class="{ 'is-off': fields[c.name].mode !== 'value' }">
           <div class="dv-ins-label">
             <div class="flex items-center gap-1.5">
               <span class="truncate font-mono text-[13px] font-semibold">{{ c.name }}</span>
@@ -102,10 +119,15 @@ onMounted(() => first.value?.querySelector<HTMLElement>('input, select, textarea
             <p v-if="c.comment" class="mt-1 truncate text-[11px] opacity-50">{{ c.comment }}</p>
           </div>
         </div>
+        <div v-if="freeFields" class="flex items-center gap-2 px-2 pt-2">
+          <input v-model="newField" class="input input-sm w-56 font-mono" placeholder="new_field" spellcheck="false" autocomplete="off" @keydown.enter.prevent="addField" />
+          <button type="button" class="btn btn-sm" :disabled="!newField.trim() || !!newFieldError" @click="addField">+ Field</button>
+          <span class="truncate text-[11px]" :class="newFieldError ? 'text-error' : 'opacity-55'">{{ newFieldError || 'Documents have no fixed columns: add any field. Numbers, true / false and { } / [ ] are stored as such.' }}</span>
+        </div>
       </div>
 
       <div class="flex items-center gap-2 border-t border-base-300/60 px-6 py-3">
-        <span class="text-xs opacity-55">{{ filled }} of {{ columns.length }} set · the rest use their defaults</span>
+        <span class="text-xs opacity-55">{{ filled }} of {{ cols.length }} set · the rest use their defaults</span>
         <span class="flex-1" />
         <button type="button" class="btn btn-ghost btn-sm" :disabled="busy" @click="emit('cancel')">Cancel <kbd class="kbd kbd-xs ml-1 opacity-60">esc</kbd></button>
         <button type="submit" class="btn btn-primary btn-sm" :disabled="busy">

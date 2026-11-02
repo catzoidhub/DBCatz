@@ -560,7 +560,7 @@ function display(v: unknown, col: string): string {
       @save="saveJson"
       @close="viewing = null"
     />
-    <DvInsertForm v-if="inserting" :table="table" :columns="insertColumns" :row-word="W.row" :busy="busy" @save="commitInsert" @cancel="inserting = false" />
+    <DvInsertForm v-if="inserting" :table="table" :columns="insertColumns" :free-fields="conn.engine === 'mongodb' || conn.engine === 'elasticsearch'" :row-word="W.row" :busy="busy" @save="commitInsert" @cancel="inserting = false" />
     <DvPrompt v-if="naming" title="Save filter" label="Name" :initial="activeFilter?.name ?? ''" placeholder="e.g. Active customers" confirm="Save" :hint="`${doc ? 'Filter' : 'WHERE'} ${where}`" @ok="saveFilter" @cancel="naming = false" />
     <ConfirmDialog v-if="confirmDelete" :title="`Delete ${selected.size} ${selected.size === 1 ? W.row : W.rows}?`" :text="`They are removed from ${table} right away; there is no undo.`" confirm="Delete" tone="error" :busy="busy" @ok="doDelete" @cancel="confirmDelete = false" />
   </div>

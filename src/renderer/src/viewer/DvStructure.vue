@@ -14,6 +14,7 @@ const props = defineProps<{ conn: DvConnection; db: string; table: string }>();
 const emit = defineEmits<{ changed: [] }>();
 const W = words(props.conn.engine);
 const sql = isSql(props.conn.engine);
+const es = props.conn.engine === 'elasticsearch';
 const st = ref<DvStructure | null>(null);
 const error = ref<string | null>(null);
 const busy = ref(false);
@@ -130,7 +131,7 @@ function submitColumn() {
     if (!d.column.unique && had) ops.push({ op: 'dropIndex', name: had });
     if (!ops.length) return void (dialog.value = null);
   }
-  void apply(ops, `${d.column.name} ${d.mode === 'add' ? 'added' : 'changed'}`, d.mode === 'add' ? 'Add column' : 'Change column');
+  void apply(ops, `${d.column.name} ${d.mode === 'add' ? 'added' : 'changed'}`, d.mode === 'add' ? (es ? 'Add field' : 'Add column') : 'Change column');
 }
 function submitIndex() {
   const d = dialog.value as Extract<Dialog, { kind: 'index' }>;
@@ -158,7 +159,17 @@ async function copy(text: string) {
             <span class="flex-1" />
             <button v-if="order.length" class="btn btn-ghost btn-sm" title="Show the columns in the table's own order again (here and in the Data tab)" @click="saveOrder([])">Reset order</button>
             <button v-if="sql" class="btn btn-sm" :disabled="readOnly" @click="addColumn">+ Column</button>
+            <button v-else-if="es" class="btn btn-sm" :disabled="readOnly" @click="addColumn">+ Field</button>
           </div>
+          <p v-if="es" class="px-4 pb-2 text-xs opacity-60">
+            The mapping tells Elasticsearch how each field is stored and searched. A field a new {{ W.row }} brings is added by
+            itself; + Field adds one with the type you choose. A field's type cannot change or be removed later: duplicate the index
+            and change it there instead.
+          </p>
+          <p v-if="conn.engine === 'mongodb'" class="px-4 pb-2 text-xs opacity-60">
+            MongoDB has no fixed columns: each document carries its own fields, and this list is read from the documents. To add a
+            field, insert a {{ W.row }} in the Data tab and use + Field there. Indexes are managed below.
+          </p>
           <table class="table table-sm">
             <thead>
               <tr>
@@ -284,15 +295,17 @@ async function copy(text: string) {
     <!-- Column dialog -->
     <dialog v-if="dialog?.kind === 'column'" open class="modal modal-open" @keydown.esc="!busy && (dialog = null)">
       <form class="modal-box w-[30rem] max-w-[95vw] space-y-4" @submit.prevent="submitColumn">
-        <h3 class="text-lg font-semibold tracking-tight">{{ dialog.mode === 'add' ? 'Add column' : `Change ${dialog.original}` }}</h3>
+        <h3 class="text-lg font-semibold tracking-tight">{{ dialog.mode === 'add' ? (es ? 'Add field' : 'Add column') : `Change ${dialog.original}` }}</h3>
         <fieldset class="grid grid-cols-2 gap-3">
           <label class="block"><span class="label-caps mb-1 block">Name</span><input v-model="dialog.column.name" class="input input-sm w-full font-mono" required spellcheck="false" pattern="[A-Za-z_][A-Za-z0-9_]*" /></label>
           <div class="block"><span class="label-caps mb-1 block">Type</span><DvTypePicker v-model="dialog.column.type" :engine="conn.engine" /></div>
+          <template v-if="!es">
           <label class="col-span-2 block"><span class="label-caps mb-1 block">Default <span class="normal-case opacity-60">(empty = none; expressions like CURRENT_TIMESTAMP work)</span></span><input v-model="dialog.column.default" class="input input-sm w-full font-mono" spellcheck="false" /></label>
           <label class="flex cursor-pointer items-center gap-2 text-sm"><input v-model="dialog.column.nullable" type="checkbox" class="checkbox checkbox-sm" />Allows NULL</label>
           <label v-if="dialog.mode === 'add'" class="flex cursor-pointer items-center gap-2 text-sm"><input v-model="dialog.column.autoIncrement" type="checkbox" class="checkbox checkbox-sm" />Auto increment</label>
           <div class="col-span-2"><DvColumnExtras :column="dialog.column" :engine="conn.engine" :sets="sets" /></div>
           <label class="flex cursor-pointer items-center gap-2 text-sm" :class="{ 'opacity-50': dialog.column.primary }" :title="dialog.column.primary ? 'A primary key is unique already' : 'No two rows may hold the same value (a UNIQUE index)'"><input v-model="dialog.column.unique" type="checkbox" class="checkbox checkbox-sm" :disabled="dialog.column.primary" />Unique</label>
+          </template>
         </fieldset>
         <div class="modal-action">
           <button type="button" class="btn btn-ghost btn-sm" :disabled="busy" @click="dialog = null">Cancel</button>

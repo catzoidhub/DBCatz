@@ -620,6 +620,16 @@ export class MongoDriver implements Driver {
   async renameTable(db: string, from: string, to: string) {
     await this.client.db(db).collection(from).rename(to);
   }
+  /** A new collection with the same indexes, filled server-side with $out (which keeps the target's indexes). */
+  async duplicateTable(db: string, from: string, to: string, withRows: boolean) {
+    const d = this.client.db(db);
+    const info = (await d.listCollections({ name: from }).next()) as { options?: Document } | null;
+    const options = info?.options ?? {};
+    await d.createCollection(to, options);
+    const indexes = (await d.collection(from).indexes()).filter((i) => i.name !== '_id_');
+    for (const { key, v: _v, ns: _ns, ...rest } of indexes) await d.collection(to).createIndex(key, rest);
+    if (withRows) await d.collection(from).aggregate([{ $match: {} }, { $out: to }]).toArray();
+  }
   async addIndex(db: string, table: string, name: string, columns: string[], unique: boolean) {
     await this.client.db(db).collection(table).createIndex(Object.fromEntries(columns.map((c) => [c, 1])), { name, unique });
   }
@@ -816,6 +826,17 @@ export class EsDriver implements Driver {
   }
   async dropTable(_db: string, table: string) {
     await this.http('DELETE', `/${encodeURIComponent(table)}`);
+  }
+  async addField(_db: string, table: string, name: string, type: string) {
+    if (!name.trim() || name.startsWith('_')) throw new Error('A field name cannot be empty or start with _');
+    await this.http('PUT', `/${encodeURIComponent(table)}/_mapping`, { properties: { [name.trim()]: { type: type || 'keyword' } } });
+  }
+  /** A new index with the same mappings and analysis settings, filled with _reindex. */
+  async duplicateTable(_db: string, from: string, to: string, withRows: boolean) {
+    const src = (await this.http('GET', `/${encodeURIComponent(from)}`))?.[from] ?? {};
+    const analysis = src.settings?.index?.analysis;
+    await this.http('PUT', `/${encodeURIComponent(to)}`, { mappings: src.mappings ?? {}, ...(analysis ? { settings: { analysis } } : {}) });
+    if (withRows) await this.http('POST', '/_reindex?refresh=true&wait_for_completion=true', { source: { index: from }, dest: { index: to } });
   }
   async truncate(_db: string, table: string) {
     await this.http('POST', `/${encodeURIComponent(table)}/_delete_by_query?refresh=true&conflicts=proceed`, { query: { match_all: {} } });

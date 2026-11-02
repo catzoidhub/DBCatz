@@ -597,7 +597,7 @@ export class DbViewerManager {
   }
 
   /** The IPC routes that need no window (dialogs are wired in index.ts). */
-  routes(): Pick<HerdApi, 'dvConnections' | 'dvSaveConnection' | 'dvDeleteConnection' | 'dvTestConnection' | 'dvServerInfo' | 'dvCancelConnect' | 'dvDisconnect' | 'dvLayout' | 'dvSetLayout' | 'dvAwsProfiles' | 'dvSshKeys' | 'dvDatabases' | 'dvTables' | 'dvStructure' | 'dvRows' | 'dvUpdateRow' | 'dvInsertRow' | 'dvDeleteRows' | 'dvQuery' | 'dvCreateDatabase' | 'dvDropDatabase' | 'dvCreateTable' | 'dvAlterTable' | 'dvDropTable' | 'dvTruncateTable' | 'dvDropTables' | 'dvTruncateTables' | 'dvTypes' | 'dvJobs' | 'dvClearJobs' | 'dvCancelJob' | 'dvKeys' | 'dvKey' | 'dvKeySet' | 'dvKeyDelete' | 'dvKeyRename' | 'dvFlush' | 'dvSavedQueries' | 'dvSaveQuery' | 'dvDeleteQuery' | 'dvGridPrefs' | 'dvSetGridPrefs' | 'dvDbPrefs' | 'dvSetDbPrefs' | 'dvCharsets' | 'dvAlterCheck'> {
+  routes(): Pick<HerdApi, 'dvConnections' | 'dvSaveConnection' | 'dvDeleteConnection' | 'dvTestConnection' | 'dvServerInfo' | 'dvCancelConnect' | 'dvDisconnect' | 'dvLayout' | 'dvSetLayout' | 'dvAwsProfiles' | 'dvSshKeys' | 'dvDatabases' | 'dvTables' | 'dvStructure' | 'dvRows' | 'dvUpdateRow' | 'dvInsertRow' | 'dvDeleteRows' | 'dvQuery' | 'dvCreateDatabase' | 'dvDropDatabase' | 'dvCreateTable' | 'dvAlterTable' | 'dvDropTable' | 'dvTruncateTable' | 'dvDuplicateTable' | 'dvDropTables' | 'dvTruncateTables' | 'dvTypes' | 'dvJobs' | 'dvClearJobs' | 'dvCancelJob' | 'dvKeys' | 'dvKey' | 'dvKeySet' | 'dvKeyDelete' | 'dvKeyRename' | 'dvFlush' | 'dvSavedQueries' | 'dvSaveQuery' | 'dvDeleteQuery' | 'dvGridPrefs' | 'dvSetGridPrefs' | 'dvDbPrefs' | 'dvSetDbPrefs' | 'dvCharsets' | 'dvAlterCheck'> {
     const confirmed = (name: string, confirm: string) => {
       if (confirm.trim() !== name) throw new Error(`Type ${name} to confirm`);
     };
@@ -657,6 +657,7 @@ export class DbViewerManager {
         }
         await ops.truncateTable(d, db, t);
       },
+      dvDuplicateTable: async (id, db, t, to, withRows) => (this.writable(id, 'New tables'), ops.duplicateTable(await D(id), db, t, to, withRows)),
       dvDropTables: async (id, db, tables, confirm, force) => {
         this.writable(id, 'Drops');
         this.bulkConfirmed(id, db, confirm);

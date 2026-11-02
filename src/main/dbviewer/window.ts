@@ -26,6 +26,7 @@ export type ViewerCommand =
   | 'tableStructure'
   | 'tableData'
   | 'tableRename'
+  | 'tableDuplicate'
   | 'tableTruncate'
   | 'tableDrop'
   | 'tableExport'
@@ -193,6 +194,7 @@ function viewerMenu(): MenuItemConstructorOptions[] {
         item('Copy CREATE Statement', 'tableCopyDdl'),
         item('Export Table…', 'tableExport'),
         sep,
+        item('Duplicate Table…', 'tableDuplicate'),
         item('Rename Table…', 'tableRename'),
         item('Truncate Table…', 'tableTruncate'),
         item('Drop Table…', 'tableDrop'),
@@ -294,6 +296,7 @@ export function tableMenu(table: string, kind: 'table' | 'view' | 'collection' |
     t(`Copy CREATE Statement`, 'tableCopyDdl'),
     t(`Export ${noun}…`, 'tableExport'),
     sep,
+    ...(kind === 'view' ? [] : [t(`Duplicate ${noun}…`, 'tableDuplicate')]),
     t(`Rename ${noun}…`, 'tableRename'),
     ...(kind === 'view' ? [] : [t(`Truncate ${noun}…`, 'tableTruncate')]),
     t(`Drop ${noun}…`, 'tableDrop'),

@@ -300,6 +300,7 @@ type Dialog =
   | { kind: 'flush'; name: string }
   | { kind: 'createTable'; name?: string }
   | { kind: 'rename'; table: string; to?: string }
+  | { kind: 'duplicate'; table: string; to?: string }
   | { kind: 'truncate'; table: string }
   | { kind: 'drop'; table: string; type: 'table' | 'view' }
   | { kind: 'export'; tables: string[]; format?: string }
@@ -346,6 +347,17 @@ async function rename(from: string, to: string) {
   busy.value = false;
   if (!ok) return;
   dialog.value = null;
+  await loadTables(false);
+  table.value = to;
+}
+async function duplicate(from: string, to: string, withRows: boolean) {
+  if (!(await confirmProdWrite(c.value, `Duplicate ${W.value.table}`, `COPY ${from} TO ${to}${withRows ? '' : ' (structure only)'}`))) return;
+  busy.value = true;
+  const ok = await act(`Duplicate ${db.value}.${from} → ${to}${withRows ? '' : ' (structure only)'}`, () => api.dvDuplicateTable(c.value.id, db.value, from, to, withRows));
+  busy.value = false;
+  if (!ok) return;
+  dialog.value = null;
+  notify('success', `${to} created`);
   await loadTables(false);
   table.value = to;
 }
@@ -415,6 +427,8 @@ function onCmd({ command, table: t, db: wantedDb, text, tables: wantedTables, da
       return;
     case 'tableRename':
       return void (target && (dialog.value = { kind: 'rename', table: target, to: name }));
+    case 'tableDuplicate':
+      return void (target && (dialog.value = { kind: 'duplicate', table: target, to: name }));
     case 'tableTruncate':
       return void (target && (dialog.value = { kind: 'truncate', table: target }));
     case 'tableDrop':
@@ -750,6 +764,7 @@ async function openService(serviceId: string) {
     <DvDanger v-if="dialog?.kind === 'flush'" :title="`Flush ${dialog.name}?`" :text="`Every key in ${dialog.name} will be deleted. This cannot be undone.`" :name="dialog.name" confirm="Flush keys" :busy="busy" @ok="(t) => flush((dialog as any).name, t)" @cancel="dialog = null" />
     <DvCreateTable v-if="dialog?.kind === 'createTable'" :conn="c" :db="db" :initial-name="dialog.name" @done="(name) => { dialog = null; loadTables(false).then(() => { table = name; mode = 'structure'; }); }" @cancel="dialog = null" />
     <DvPrompt v-if="dialog?.kind === 'rename'" :title="`Rename ${dialog.table}`" label="New name" :initial="dialog.to || dialog.table" :busy="busy" confirm="Rename" @ok="(to) => rename((dialog as any).table, to)" @cancel="dialog = null" />
+    <DvPrompt v-if="dialog?.kind === 'duplicate'" :title="`Duplicate ${dialog.table}`" label="New name" :initial="dialog.to || `${dialog.table}_copy`" :check="`Copy the ${W.rows} too`" :hint="isSql(c.engine) ? `Columns, keys and indexes are copied; foreign keys and triggers stay with ${dialog.table}.` : c.engine === 'elasticsearch' ? 'The mappings and analysis settings are copied.' : 'The indexes are copied.'" :busy="busy" confirm="Duplicate" @ok="(to, rows) => duplicate((dialog as any).table, to, rows)" @cancel="dialog = null" />
     <DvDanger v-if="dialog?.kind === 'truncate'" :title="`Empty ${dialog.table}?`" :text="`All ${W.rows} of ${dialog.table} will be deleted; the ${W.table} itself stays.`" :name="dialog.table" confirm="Delete all rows" :busy="busy" @ok="(t) => truncate((dialog as any).table, t)" @cancel="dialog = null" />
     <DvDanger v-if="dialog?.kind === 'drop'" :title="`Drop ${dialog.table}?`" :text="`The ${dialog.type === 'view' ? 'view' : W.table} and ${dialog.type === 'view' ? 'its definition' : `all its ${W.rows}`} will be deleted. This cannot be undone.`" :name="dialog.table" :confirm="`Drop ${dialog.type === 'view' ? 'view' : W.table}`" :busy="busy" @ok="(t) => drop((dialog as any).table, t)" @cancel="dialog = null" />
     <DvBulkDanger v-if="dialog?.kind === 'bulk'" :kind="dialog.what" :conn="c" :db="db" :tables="dialog.tables" :busy="busy" @ok="(confirm, force) => bulk((dialog as any).what, (dialog as any).tables, confirm, force)" @cancel="dialog = null" />

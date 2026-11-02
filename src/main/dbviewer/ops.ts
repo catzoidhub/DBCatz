@@ -197,6 +197,10 @@ export async function alterTable(d: Driver, db: string, table: string, ops: DvAl
         else await d.exec(db, e === 'mysql' || e === 'mariadb' ? `ALTER TABLE ${t} DROP INDEX ${quoteIdent(e, op.name)}` : `DROP INDEX ${quoteIdent(e, op.name)}`);
         break;
       case 'addColumn':
+        if (d.addField) {
+          await d.addField(db, table, op.column.name, op.column.type);
+          break;
+        }
         if (!DV_SQL.includes(e)) throw new Error('Documents have no fixed columns; add fields on the rows');
         await d.exec(db, `ALTER TABLE ${t} ADD COLUMN ${columnSql(e, op.column, true)}${op.after && (e === 'mysql' || e === 'mariadb') ? ` AFTER ${col(e, op.after)}` : ''}`);
         if (op.column.unique && !op.column.primary) await d.exec(db, `CREATE UNIQUE INDEX ${quoteIdent(e, `${table}_${op.column.name}_unique`)} ON ${t} (${col(e, op.column.name)})`);
@@ -236,4 +240,52 @@ export async function dropTable(d: Driver, db: string, table: string) {
 export async function truncateTable(d: Driver, db: string, table: string) {
   if (d.truncate) return d.truncate(db, table);
   await d.exec(db, d.engine === 'sqlite' ? `DELETE FROM ${quoteTable('sqlite', table)}` : `TRUNCATE TABLE ${quoteTable(d.engine, table)}`);
+}
+
+/**
+ * A copy of `table` named `to`, with its columns, keys and indexes, and its rows when `withRows` (foreign keys and
+ * triggers stay with the original). Generated columns are left to compute themselves in the copy.
+ */
+export async function duplicateTable(d: Driver, db: string, table: string, to: string, withRows: boolean) {
+  const e = d.engine;
+  if (d.duplicateTable) return d.duplicateTable(db, table, to, withRows);
+  for (const part of e === 'postgresql' ? to.split('.') : [to]) checkName(part, 'Table name');
+  const src = quoteTable(e, table);
+  const dst = quoteTable(e, to);
+  if (e === 'mysql' || e === 'mariadb') {
+    await d.exec(db, `CREATE TABLE ${dst} LIKE ${src}`);
+    if (!withRows) return;
+    const r = await d.query(db, `SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND EXTRA NOT LIKE '%GENERATED%' ORDER BY ORDINAL_POSITION`, [db, table]);
+    const cols = r.rows.map((x) => quoteIdent(e, String(x[0]))).join(', ');
+    await d.exec(db, `INSERT INTO ${dst} (${cols}) SELECT ${cols} FROM ${src}`);
+  } else if (e === 'postgresql') {
+    // INCLUDING ALL: defaults, constraints, indexes, identity and comments; a serial column keeps using the original's sequence.
+    await d.exec(db, `CREATE TABLE ${dst} (LIKE ${src} INCLUDING ALL)`);
+    if (!withRows) return;
+    const [schema, name] = table.includes('.') ? [table.slice(0, table.indexOf('.')), table.slice(table.indexOf('.') + 1)] : ['public', table];
+    const r = await d.query(db, `SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ? AND is_generated = 'NEVER' ORDER BY ordinal_position`, [schema, name]);
+    const cols = r.rows.map((x) => quoteIdent(e, String(x[0]))).join(', ');
+    await d.exec(db, `INSERT INTO ${dst} (${cols}) OVERRIDING SYSTEM VALUE SELECT ${cols} FROM ${src}`);
+    // The copy's identity columns got sequences of their own, still at 1: move them past the copied rows.
+    const ids = await d.query(db, `SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ? AND is_identity = 'YES'`, [schema, name]);
+    for (const [c] of ids.rows) {
+      const q = quoteIdent(e, String(c));
+      await d.exec(db, `SELECT setval(pg_get_serial_sequence('${dst.replace(/'/g, "''")}', '${String(c).replace(/'/g, "''")}'), COALESCE((SELECT MAX(${q}) FROM ${dst}), 0) + 1, false)`);
+    }
+  } else if (e === 'sqlite') {
+    const r = await d.query(db, `SELECT type, name, sql FROM sqlite_master WHERE tbl_name = ? AND sql IS NOT NULL AND type IN ('table', 'index') ORDER BY type = 'index'`, [table]);
+    const create = r.rows.find((x) => x[0] === 'table');
+    if (!create) throw new Error(`${table} not found`);
+    // The saved CREATE statement with the new name, then each index under a name of its own.
+    const head = /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"(?:[^"]|"")+"|`[^`]+`|\[[^\]]+\]|[^\s(]+)/i;
+    await d.exec(db, String(create[2]).replace(head, `CREATE TABLE ${dst}`));
+    for (const x of r.rows.filter((x) => x[0] === 'index')) {
+      const sql = String(x[2]).replace(/^(\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+)(?:IF\s+NOT\s+EXISTS\s+)?(?:"(?:[^"]|"")+"|`[^`]+`|\[[^\]]+\]|\S+)(\s+ON\s+)(?:"(?:[^"]|"")+"|`[^`]+`|\[[^\]]+\]|[^\s(]+)/i, `$1${quoteIdent(e, `${to}_${x[1]}`)}$2${dst}`);
+      await d.exec(db, sql);
+    }
+    if (!withRows) return;
+    const c = await d.query(db, `SELECT name FROM pragma_table_xinfo(?) WHERE hidden = 0 ORDER BY cid`, [table]);
+    const cols = c.rows.map((x) => quoteIdent(e, String(x[0]))).join(', ');
+    await d.exec(db, `INSERT INTO ${dst} (${cols}) SELECT ${cols} FROM ${src}`);
+  } else throw new Error(`${e} cannot duplicate a table`);
 }

@@ -77,6 +77,9 @@ export interface Driver {
   dropTable?(db: string, table: string): Promise<void>;
   truncate?(db: string, table: string): Promise<void>;
   renameTable?(db: string, from: string, to: string): Promise<void>;
+  duplicateTable?(db: string, from: string, to: string, withRows: boolean): Promise<void>;
+  /** Elasticsearch: a new field in the index mapping (existing fields cannot change). */
+  addField?(db: string, table: string, name: string, type: string): Promise<void>;
   addIndex?(db: string, table: string, name: string, columns: string[], unique: boolean): Promise<void>;
   dropIndex?(db: string, table: string, name: string): Promise<void>;
   documents?(db: string, table: string): AsyncGenerator<Record<string, unknown>>;
