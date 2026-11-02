@@ -260,7 +260,7 @@ export class AskAi {
   private async askDbcatzParts(req: DvAskRequest): Promise<{ system: string; turns: DvAiTurn[] }> {
     const conns = this.viewer.connections();
     const MODE = { normal: 'normal', production: 'PRODUCTION (writes ask first)', readonly: 'READ-ONLY' } as const;
-    const lines = conns.map((c) => `${c.id}: "${c.name}" ${DIALECT[c.engine] ?? c.engine}, ${MODE[this.viewer.mode(c.id)]}${c.connected ? ', connected' : ''}${c.serviceId ? `, a DevCatz service (${c.running ? 'running' : 'STOPPED: start it in DevCatz with open-devcatz'})` : ''}`);
+    const lines = conns.map((c) => `${c.id}: "${c.name}" ${DIALECT[c.engine] ?? c.engine}, ${MODE[this.viewer.mode(c.id)]}${c.connected ? ', connected' : ''}${c.serviceId ? `, a ${c.serviceApp} service (${c.running ? 'running' : `STOPPED: start it in ${c.serviceApp} with open-devcatz`})` : ''}`);
     const w = req.where;
     const cur = conns.find((c) => c.id === w.connId);
     const here: string[] = [];

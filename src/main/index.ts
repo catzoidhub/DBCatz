@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
 import { applyMenu, appMenuPopup, menuKey, menuShortcuts, openViewer, setUpdateLabel, tableMenu, viewerWindow } from './dbviewer/window';
-import { DevCatzServices } from './devcatz';
+import { AppServices } from './devcatz';
 import { AskAi } from './ai';
 import { applySettings, migrateToShared, setAiKey, setSettings, settings } from './settings';
 import { siteBase } from './shared';
@@ -16,10 +16,11 @@ import { openCatzoidApp, platformId } from './companion';
 /**
  * DBCatz — a database viewer for MySQL / MariaDB, PostgreSQL, SQLite, Redis /
  * Valkey, MongoDB and Elasticsearch: one window with a tab per connection.
- * Standalone, with DevCatz's local services listed when DevCatz is installed,
- * and opened from DevCatz (or any app) through dbcatz:// links:
+ * Standalone, with DevCatz's and DoCatz's local services listed when they are
+ * installed, and opened from them (or any app) through dbcatz:// links:
  *   dbcatz://open                         the Connections tab
  *   dbcatz://open?conn=svc:<id>&db=<db>   a DevCatz service, at a database
+ *   dbcatz://open?docatz=<id>             a DoCatz database container (its password comes from DoCatz's file, never the link)
  *   dbcatz://open?conn=<saved id>
  *   dbcatz://open?conn=<id>&db=<db>&table=<table>[&col=<column>&val=<value>]
  *                                         a table's data, filtered to column = value (DialCatz's "Check in DBCatz");
@@ -29,8 +30,9 @@ import { openCatzoidApp, platformId } from './companion';
  *   dbcatz://url?u=<encoded connection URL>  a URL as a session connection
  */
 
-const devcatz = new DevCatzServices();
-const viewer = new DbViewerManager(devcatz);
+const devcatz = new AppServices('DevCatz');
+const docatz = new AppServices('DoCatz');
+const viewer = new DbViewerManager(devcatz, docatz);
 const ai = new AskAi(viewer);
 const updater = new Updater();
 const reporter = new Reporter();
@@ -52,8 +54,14 @@ function handleLink(raw: string): void {
       const c = viewer.openUrl(q.get('u')!);
       return openViewer(c.id);
     }
+    const doc = text(q.get('docatz'), 160);
+    if (doc !== undefined) {
+      if (!/^[\w.-]+$/.test(doc)) throw new Error('bad DoCatz service id');
+      docatz.refresh(); // a container DoCatz just started may not have reached the poll yet
+      return openViewer(`doc:${doc}`, text(q.get('db'), 256));
+    }
     const conn = text(q.get('conn'), 160);
-    if (conn !== undefined && !/^(svc:)?[\w.:-]+$/.test(conn)) throw new Error('bad connection id');
+    if (conn !== undefined && !/^((svc|doc):)?[\w.:-]+$/.test(conn)) throw new Error('bad connection id');
     const table = text(q.get('table'), 256);
     const col = table !== undefined ? text(q.get('col'), 128) : undefined;
     const val = col !== undefined ? (text(q.get('val'), 1000, true) ?? '') : undefined;
@@ -92,8 +100,8 @@ function api(): DbCatzApi {
   const win = () => viewerWindow() ?? undefined;
   return {
     appInfo: async () => {
-      const devcatzPath = await DevCatzServices.locate();
-      return { version: app.getVersion(), devcatz: devcatzPath !== null || (await devcatz.installed()), devcatzPath, site: siteBase(), platform: platformId() ?? '' };
+      const [devcatzPath, docatzPath] = await Promise.all([devcatz.locate(), docatz.locate()]);
+      return { version: app.getVersion(), devcatz: devcatzPath !== null || (await devcatz.installed()), devcatzPath, docatzPath, site: siteBase(), platform: platformId() ?? '' };
     },
     aboutInfo: async () => ({
       version: app.getVersion(),
@@ -152,10 +160,16 @@ function api(): DbCatzApi {
       return r.canceled ? null : r.filePaths[0];
     },
     openInDevCatz: async (serviceId) => {
-      const path = await DevCatzServices.locate();
+      const path = await devcatz.locate();
       if (!path) return false;
       // That very copy at the service: `open -a` on a Mac, the .exe with the link on Windows.
       await openCatzoidApp(path, `devcatz://db/${encodeURIComponent(serviceId)}`);
+      return true;
+    },
+    openInDoCatz: async () => {
+      const path = await docatz.locate();
+      if (!path) return false;
+      await openCatzoidApp(path, 'docatz://open');
       return true;
     },
     ...viewer.routes(),
@@ -223,7 +237,7 @@ app.whenReady().then(() => {
   reporter.start();
   updater.start();
   writeBridge(viewer.connections());
-  devcatz.onChange = () => {
+  devcatz.onChange = docatz.onChange = () => {
     viewer.servicesChanged();
     send('viewer:changed', null);
   };

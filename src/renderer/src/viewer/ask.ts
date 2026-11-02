@@ -124,13 +124,17 @@ export async function runAsk(a: DvAskAction): Promise<string> {
       dispatch({ command: 'dbFlush' });
       return `Confirm in the dialog: type ${x.database} to flush it`;
     case 'edit-connection':
-      if (conn.serviceId) throw new Error(`${conn.name} is a DevCatz service: change it in DevCatz`);
+      if (conn.serviceId) throw new Error(`${conn.name} is a ${conn.serviceApp} service: change it in ${conn.serviceApp}`);
       editing.value = conn;
       showSettings.value = false;
       active.value = 'home';
       return 'Connection form open';
     case 'open-devcatz': {
-      if (!conn.serviceId) throw new Error(`${conn.name} is not a DevCatz service`);
+      if (!conn.serviceId) throw new Error(`${conn.name} is not a DevCatz or DoCatz service`);
+      if (conn.serviceApp === 'DoCatz') {
+        if (!(await api.openInDoCatz())) throw new Error(`DoCatz is not installed on ${words.thisComputer}`);
+        return `DoCatz opened${conn.running ? '' : `: start ${conn.project || conn.name} there`}`;
+      }
       const found = await api.openInDevCatz(conn.serviceId);
       if (!found) {
         await openDevCatzDownload();

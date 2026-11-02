@@ -7,6 +7,7 @@ import CatMood from './CatMood.vue';
 import { DB_LOGO } from '../db';
 import DvProgress from './DvProgress.vue';
 import devcatzLogo from '../assets/logos/devcatz.png';
+import docatzLogo from '../assets/logos/docatz.png';
 import { confirmProdWrite, isProd, isReadOnly, isSql, active, closeTab, editing, jobs, ENGINE_NAME, newToken, progress, DV_HINT, fmtBytes, fmtNum, isKv, isSystemDb, isSystemTable, logActivity, onCommand, tabState, words, type Command } from './viewer';
 import DvDataGrid from './DvDataGrid.vue';
 import DvStructure from './DvStructure.vue';
@@ -577,8 +578,12 @@ function contextMenu(t: DvTable) {
   void api.dvTableMenu(t.name, kindOf(t));
 }
 const tableIcon = (t: DvTable) => (t.type === 'view' ? 'M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Zm8 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z' : 'M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15.5v-11ZM4.5 7v2.5h4.75V7H4.5Zm6.25 0v2.5h4.75V7h-4.75ZM4.5 11v2.5h4.75V11H4.5Zm6.25 0v2.5h4.75V11h-4.75Z');
-/** Open in DevCatz on a service's error screen; without the DevCatz app, its download page instead. */
+/** Open in DevCatz / DoCatz on a service's error screen; without the DevCatz app, its download page instead. */
 async function openService(serviceId: string) {
+  if (c.value.serviceApp === 'DoCatz') {
+    if (!(await api.openInDoCatz())) notify('info', `DoCatz is not installed on ${platformWords.thisComputer}`);
+    return;
+  }
   if (await api.openInDevCatz(serviceId)) return;
   notify('info', `DevCatz is not installed on ${platformWords.thisComputer}: opening its download page`);
   await openDevCatzDownload();
@@ -701,12 +706,15 @@ async function openService(serviceId: string) {
           <div v-if="error" class="mt-4 flex flex-wrap justify-end gap-2">
             <button class="btn btn-ghost btn-sm" @click="closeTab(tabId)">Close tab</button>
             <button v-if="!c.serviceId" class="btn btn-sm" @click="editing = c; active = 'home'">Edit connection</button>
+            <button v-else-if="c.serviceApp === 'DoCatz'" class="btn btn-sm gap-2" title="Open DoCatz, where the container can be started" @click="openService(c.serviceId!)">
+              <img :src="docatzLogo" alt="" class="size-5 drop-shadow-sm" draggable="false" />Open in DoCatz
+            </button>
             <button v-else class="btn btn-sm gap-2" title="Show this service on DevCatz's Database page, where it can be started" @click="openService(c.serviceId!)">
               <img :src="devcatzLogo" alt="" class="size-5 drop-shadow-sm" draggable="false" />Open in DevCatz
             </button>
             <button class="btn btn-primary btn-sm" @click="connect">Try again</button>
           </div>
-          <p v-if="error && c.serviceId" class="mt-3 text-xs opacity-60">Start the service in DevCatz (Database page), then try again.</p>
+          <p v-if="error && c.serviceId" class="mt-3 text-xs opacity-60">{{ c.serviceApp === 'DoCatz' ? `Start ${c.project || 'the project'} in DoCatz, then try again.` : 'Start the service in DevCatz (Database page), then try again.' }}</p>
         </div>
       </div>
       <template v-else>

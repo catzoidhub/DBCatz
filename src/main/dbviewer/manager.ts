@@ -2,9 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { safeStorage } from 'electron';
-import type { DbEngine, DvAlterOp, DvAws, DvConnection, DvLayout, DvConnectionInput, DvConnectProgress, DvExportOptions, DvImportOptions, DvJob, DvMethod, DvGridPrefs, DvOptions, DvSavedFilter, DvSavedQuery, DvDbPrefs, DvSsh, DvVault, DbCatzApi as HerdApi } from '@shared/types';
+import type { DbEngine, DevCatzService, DvAlterOp, DvAws, DvConnection, DvLayout, DvConnectionInput, DvConnectProgress, DvExportOptions, DvImportOptions, DvJob, DvMethod, DvGridPrefs, DvOptions, DvSavedFilter, DvSavedQuery, DvDbPrefs, DvSsh, DvVault, DbCatzApi as HerdApi } from '@shared/types';
 import { DV_DEFAULT_OPTIONS, DV_KEYVALUE } from '@shared/types';
-import type { DevCatzServices } from '../devcatz';
+import type { AppServices } from '../devcatz';
 import { parseDbUrl } from '@shared/dburl';
 import { store } from '../store';
 import { TYPES, type Driver } from './driver';
@@ -53,6 +53,9 @@ const LAYOUT = 'dvLayout';
 const GRIDS = 'dvGrids';
 const DB_PREFS = 'dvDbPrefs';
 const DEFAULT_PORT: Record<DbEngine, number> = { mysql: 3306, mariadb: 3306, postgresql: 5432, redis: 6379, valkey: 6379, mongodb: 27017, elasticsearch: 9200, sqlite: 0 };
+/** The database a service opens at: the one DoCatz names (SQL / MongoDB), else postgres for PostgreSQL. */
+const serviceDatabase = (c: DevCatzService) =>
+  c.database && ['postgresql', 'mysql', 'mariadb', 'mongodb'].includes(c.engine) ? c.database : c.engine === 'postgresql' ? 'postgres' : '';
 
 interface Open extends Opened {
   key: string;
@@ -72,7 +75,20 @@ export class DbViewerManager {
   /** Connections opened / closed (the window refreshes its list). */
   onChange: () => void = () => undefined;
 
-  constructor(private dbs: DevCatzServices) {}
+  /** DevCatz's services as `svc:<id>`, DoCatz's as `doc:<id>`. */
+  constructor(
+    private dbs: AppServices,
+    private docs: AppServices,
+  ) {}
+
+  /** The service feeds with the id prefix of their connections. */
+  private feeds(): [string, AppServices][] {
+    return [
+      ['svc:', this.dbs],
+      ['doc:', this.docs],
+    ];
+  }
+  private isService = (id: string) => id.startsWith('svc:') || id.startsWith('doc:');
 
   private saved(): Saved[] {
     return store.extra<Saved[]>(KEY) ?? [];
@@ -102,6 +118,8 @@ export class DbViewerManager {
       database: s.database,
       file: s.file,
       serviceId: null,
+      serviceApp: null,
+      project: '',
       running: true,
       color: s.color,
       method: s.method ?? 'tcp',
@@ -120,47 +138,52 @@ export class DbViewerManager {
 
   /** Service connections first (live port / user / running), then the saved ones, then this session's. */
   connections(): DvConnection[] {
-    const services: DvConnection[] = this.dbs.list().map((c) => ({
-      id: `svc:${c.id}`,
-      name: c.name,
-      engine: c.engine,
-      host: c.host || '127.0.0.1',
-      port: c.port,
-      user: c.user,
-      hasPassword: !!c.password,
-      database: c.engine === 'postgresql' ? 'postgres' : '',
-      file: c.engine === 'sqlite' ? c.dataDir : '',
-      serviceId: c.id,
-      running: c.engine === 'sqlite' ? true : c.running,
-      color: null,
-      method: 'tcp',
-      socket: '',
-      ssh: null,
-      aws: null,
-      vault: null,
-      options: { ...DV_DEFAULT_OPTIONS },
-      hasSshSecret: false,
-      hasAwsSecret: false,
-      hasVaultToken: false,
-      temporary: false,
-      connected: this.drivers.has(`svc:${c.id}`),
-    }));
+    const services: DvConnection[] = this.feeds().flatMap(([prefix, feed]) =>
+      feed.list().map((c) => ({
+        id: `${prefix}${c.id}`,
+        name: c.name,
+        engine: c.engine,
+        host: c.host || '127.0.0.1',
+        port: c.port,
+        user: c.user,
+        hasPassword: !!c.password,
+        database: serviceDatabase(c),
+        file: c.engine === 'sqlite' ? c.dataDir : '',
+        serviceId: c.id,
+        serviceApp: feed.app,
+        project: c.project ?? '',
+        running: c.engine === 'sqlite' ? true : c.running,
+        color: null,
+        method: 'tcp',
+        socket: '',
+        ssh: null,
+        aws: null,
+        vault: null,
+        options: { ...DV_DEFAULT_OPTIONS },
+        hasSshSecret: false,
+        hasAwsSecret: false,
+        hasVaultToken: false,
+        temporary: false,
+        connected: this.drivers.has(`${prefix}${c.id}`),
+      })),
+    );
     return [...services, ...this.saved().map((s) => this.view(s, false)), ...[...this.temporary.values()].map((s) => this.view(s, true))];
   }
 
   /** What establish() needs for a connection id (secrets decrypted). */
   private planOf(id: string): Plan {
-    if (id.startsWith('svc:')) {
-      const c = this.dbs.list().find((x) => x.id === id.slice(4));
-      if (!c) throw new Error('This DevCatz service no longer exists (DevCatz removed it, or is not installed)');
-      if (c.engine !== 'sqlite' && !c.running) throw new Error(`${c.name} is not running; start it in DevCatz`);
+    const feed = this.feeds().find(([prefix]) => id.startsWith(prefix))?.[1];
+    if (feed) {
+      const c = feed.list().find((x) => x.id === id.slice(4));
+      if (!c) throw new Error(`This ${feed.app} service no longer exists (${feed.app} removed it, or is not installed)`);
+      if (c.engine !== 'sqlite' && !c.running) throw new Error(`${c.name} is not running; start it in ${feed.app}`);
       return {
         engine: c.engine,
         host: c.host || '127.0.0.1',
         port: c.port,
         user: c.user,
         password: c.password,
-        database: c.engine === 'postgresql' ? 'postgres' : '',
+        database: serviceDatabase(c),
         file: c.engine === 'sqlite' ? c.dataDir : '',
         method: 'tcp',
         socket: '',
@@ -241,18 +264,18 @@ export class DbViewerManager {
     try {
       return this.planOf(id);
     } catch (e) {
-      if (token) this.onProgress({ token, steps: [id.startsWith('svc:') ? 'Find the DevCatz service' : 'Read the connection settings'], step: 0, detail: '', done: true, error: (e as Error).message });
+      if (token) this.onProgress({ token, steps: [id.startsWith('svc:') ? 'Find the DevCatz service' : id.startsWith('doc:') ? 'Find the DoCatz service' : 'Read the connection settings'], step: 0, detail: '', done: true, error: (e as Error).message });
       throw e;
     }
   }
 
   /**
-   * DevCatz's services changed: connections to a service that stopped or was
+   * DevCatz's or DoCatz's services changed: connections to a service that stopped or was
    * removed are closed, so their tabs show Reconnect instead of failing later.
    */
   servicesChanged(): void {
-    const live = new Set(this.dbs.list().filter((s) => s.running || s.engine === 'sqlite').map((s) => `svc:${s.id}`));
-    for (const id of [...this.drivers.keys()]) if (id.startsWith('svc:') && !live.has(id)) this.release(id);
+    const live = new Set(this.feeds().flatMap(([prefix, feed]) => feed.list().filter((s) => s.running || s.engine === 'sqlite').map((s) => `${prefix}${s.id}`)));
+    for (const id of [...this.drivers.keys()]) if (this.isService(id) && !live.has(id)) this.release(id);
     this.onChange();
   }
 
@@ -692,12 +715,12 @@ export class DbViewerManager {
     };
   }
 
-  /** Normal / Production / Read-only of a connection (DevCatz services are normal). */
+  /** Normal / Production / Read-only of a connection (DevCatz and DoCatz services are normal). */
   mode(id: string): DvOptions['mode'] {
     return this.modeOf(id);
   }
   private modeOf(id: string): DvOptions['mode'] {
-    if (id.startsWith('svc:')) return 'normal';
+    if (this.isService(id)) return 'normal';
     return this.find(id)?.options?.mode ?? 'normal';
   }
 

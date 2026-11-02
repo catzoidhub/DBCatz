@@ -8,7 +8,7 @@ import { currentOS, keyLabel, type OS } from './platform';
 
 export type DbEngine = 'mysql' | 'mariadb' | 'postgresql' | 'redis' | 'valkey' | 'mongodb' | 'elasticsearch' | 'sqlite';
 
-/** A database service DevCatz runs, as it writes them for DBCatz (services.json). */
+/** A database service DevCatz or DoCatz runs, as it writes them for DBCatz (services.json). */
 export interface DevCatzService {
   id: string;
   name: string;
@@ -22,11 +22,16 @@ export interface DevCatzService {
   dataDir: string;
   socket: string;
   running: boolean;
+  /** DoCatz: the database to open first (from the image's env). */
+  database?: string;
+  /** DoCatz: the compose project and service the container belongs to. */
+  project?: string;
+  service?: string;
 }
 export interface DevCatzServicesFile {
   version: 1;
-  app: 'DevCatz';
-  /** When DevCatz last wrote it (ms). */
+  app: 'DevCatz' | 'DoCatz';
+  /** When the app last wrote it (ms). */
   written: number;
   services: DevCatzService[];
 }
@@ -232,8 +237,12 @@ export interface DvConnection {
   database: string;
   /** SQLite: the folder of .sqlite files (DevCatz service) or one file (saved connection). */
   file: string;
-  /** The DevCatz service this connection belongs to (null = saved by the user). */
+  /** The DevCatz / DoCatz service this connection belongs to (null = saved by the user). */
   serviceId: string | null;
+  /** Which app runs that service (null = saved by the user). */
+  serviceApp: 'DevCatz' | 'DoCatz' | null;
+  /** DoCatz: the compose project of the service ('' otherwise). */
+  project: string;
   /** Running (services) / reachable is checked on connect. */
   running: boolean;
   /** Accent colour of the tab (saved connections). */
@@ -697,7 +706,7 @@ export interface DbCatzApi {
    * app is gone, even if its services file is left behind), the shared Catzoid site address and this computer's
    * platform as the site's download links name it (mac-arm64, mac-x64, win-x64; '' when there is no build for it).
    */
-  appInfo(): Promise<{ version: string; devcatz: boolean; devcatzPath: string | null; site: string; platform: string }>;
+  appInfo(): Promise<{ version: string; devcatz: boolean; devcatzPath: string | null; docatzPath: string | null; site: string; platform: string }>;
   /** Version, platform and the shared site address, for Settings → About. */
   aboutInfo(): Promise<AboutInfo>;
   /** In-app updates (Catzoid #54): the current state; changes arrive through onUpdate. */
@@ -753,6 +762,8 @@ export interface DbCatzApi {
   pickFile(title: string): Promise<string | null>;
   /** Opens DevCatz at a database service (devcatz://db/<id>) when it is installed. */
   openInDevCatz(serviceId: string): Promise<boolean>;
+  /** Opens DoCatz (where its containers are started) when it is installed. */
+  openInDoCatz(): Promise<boolean>;
   // Database viewer
   dvConnections(): Promise<DvConnection[]>;
   dvSaveConnection(input: DvConnectionInput): Promise<DvConnection>;
@@ -825,7 +836,7 @@ export interface DbCatzApi {
   dvMenuKey(key: string): Promise<void>;
   /** Asks for a SQLite file or folder for a new connection. */
   dvPickSqlite(): Promise<string | null>;
-  /** Opens DBCatz at a connection (`svc:<service id>` / saved id); null = the New connection screen. */
+  /** Opens DBCatz at a connection (`svc:<DevCatz service id>` / `doc:<DoCatz service id>` / saved id); null = the New connection screen. */
   dvOpen(connId: string | null, database?: string): Promise<void>;
   /** Redis / Valkey: keys matching a glob (SCAN), at most `limit`, with the count found. */
   dvKeys(connId: string, database: string, pattern: string, limit: number): Promise<{ keys: DvKey[]; total: number }>;
@@ -851,6 +862,6 @@ export interface DbCatzApi {
 
 /** Every method of the bridge, registered as `dbcatz:<name>` IPC handlers. */
 export const API_METHODS: (keyof DbCatzApi)[] = [
-  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'openUrl', 'pickFile', 'openInDevCatz',
+  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
   'dvConnections', 'dvSaveConnection', 'dvDeleteConnection', 'dvTestConnection', 'dvServerInfo', 'dvCancelConnect', 'dvDisconnect', 'dvLayout', 'dvSetLayout', 'dvAwsProfiles', 'dvSshKeys', 'dvDatabases', 'dvTables', 'dvStructure', 'dvRows', 'dvUpdateRow', 'dvInsertRow', 'dvDeleteRows', 'dvQuery', 'dvCreateDatabase', 'dvCharsets', 'dvDropDatabase', 'dvCreateTable', 'dvAlterCheck', 'dvAlterTable', 'dvDropTable', 'dvTruncateTable', 'dvDuplicateTable', 'dvDropTables', 'dvTruncateTables', 'dvTypes', 'dvExport', 'dvImport', 'dvBackup', 'dvJobs', 'dvClearJobs', 'dvCancelJob', 'dvReveal', 'dvTableMenu', 'dvAppMenu', 'dvMenuShortcuts', 'dvMenuKey', 'dvPickSqlite', 'dvOpen', 'dvKeys', 'dvKey', 'dvKeySet', 'dvKeyDelete', 'dvKeyRename', 'dvFlush', 'dvSavedQueries', 'dvSaveQuery', 'dvDeleteQuery', 'dvGridPrefs', 'dvSetGridPrefs', 'dvDbPrefs', 'dvSetDbPrefs',
 ];

@@ -22,7 +22,7 @@ interface BridgeConnection {
   database: string | null;
   /** SQLite: the database file (saved) or folder of files (DevCatz service). */
   file?: string;
-  source: 'saved' | 'devcatz';
+  source: 'saved' | 'devcatz' | 'docatz';
 }
 
 /** The ecosystem's engine names (DBCatz says postgresql). */
@@ -38,7 +38,7 @@ function entry(c: DvConnection): BridgeConnection {
     port: sqlite ? null : c.port || null,
     database: c.database || null,
     ...(sqlite ? { file: c.file } : {}),
-    source: c.serviceId ? 'devcatz' : 'saved',
+    source: c.serviceApp === 'DoCatz' ? 'docatz' : c.serviceId ? 'devcatz' : 'saved',
   };
 }
 

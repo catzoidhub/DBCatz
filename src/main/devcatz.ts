@@ -5,69 +5,82 @@ import type { DevCatzService, DevCatzServicesFile } from '@shared/types';
 import { findCatzoidApp } from './companion';
 
 /**
- * DevCatz integration: DevCatz writes the database services it manages to
- * services.json in its data folder (owner-only file); DBCatz lists them as
- * "DevCatz services" and follows the file while it changes. Nothing here
- * talks to DevCatz directly — the file is the whole contract.
+ * DevCatz and DoCatz integration: each writes the database services it runs to
+ * dbcatz/services.json in its data folder (owner-only file); DBCatz lists them
+ * as "DevCatz services" / "DoCatz services" and follows the file while it
+ * changes. Nothing here talks to the apps directly — the file is the whole
+ * contract.
  */
 
-/** DevCatz's data folder: ~/Library/Application Support/DevCatz on a Mac, %APPDATA%\DevCatz on Windows. */
-const DEVCATZ_DATA =
-  process.platform === 'win32' ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'DevCatz') : join(homedir(), 'Library', 'Application Support', 'DevCatz');
-export const SERVICES_FILE = process.env.DBCATZ_SERVICES_FILE || join(DEVCATZ_DATA, 'dbcatz', 'services.json');
+/** An app's data folder: ~/Library/Application Support/<App> on a Mac, %APPDATA%\<App> on Windows. */
+const dataDir = (app: string) =>
+  process.platform === 'win32' ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), app) : join(homedir(), 'Library', 'Application Support', app);
 
-export class DevCatzServices {
+export type ServicesApp = 'DevCatz' | 'DoCatz';
+const APPS: Record<ServicesApp, { scheme: string; bundleId: string; env: string }> = {
+  DevCatz: { scheme: 'devcatz', bundleId: 'com.mrcatz.devcatz', env: 'DBCATZ_SERVICES_FILE' },
+  DoCatz: { scheme: 'docatz', bundleId: 'com.mrcatz.docatz', env: 'DBCATZ_DOCATZ_SERVICES_FILE' },
+};
+
+export class AppServices {
   private services: DevCatzService[] = [];
   private mtime = 0;
   private watcher: FSWatcher | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private readonly file: string;
   onChange: () => void = () => undefined;
 
-  constructor() {
+  constructor(readonly app: ServicesApp) {
+    this.file = process.env[APPS[app].env] || join(dataDir(app), 'dbcatz', 'services.json');
     this.read();
     this.follow();
   }
 
   /**
-   * The DevCatz app wherever it lives — /Applications or ~/Applications on a Mac, the per-user install folder on
-   * Windows, else the app that opens devcatz:// links, else (Mac) Spotlight by bundle id (companion.ts).
+   * The app wherever it lives — /Applications or ~/Applications on a Mac, the per-user install folder on
+   * Windows, else the app that opens its links, else (Mac) Spotlight by bundle id (companion.ts).
    */
-  static locate(): Promise<string | null> {
-    return findCatzoidApp('DevCatz', 'devcatz', 'com.mrcatz.devcatz');
+  locate(): Promise<string | null> {
+    return findCatzoidApp(this.app, APPS[this.app].scheme, APPS[this.app].bundleId);
   }
 
-  /** DevCatz is on this Mac: its app was found, or it has written a services file (even an empty one). */
+  /** The app is on this computer: it was found, or it has written a services file (even an empty one). */
   async installed(): Promise<boolean> {
-    return existsSync(SERVICES_FILE) || (await DevCatzServices.locate()) !== null;
+    return existsSync(this.file) || (await this.locate()) !== null;
   }
 
   list(): DevCatzService[] {
     return this.services;
   }
 
+  /** Reads the file now instead of at the next change or poll. */
+  refresh(): void {
+    if (this.read()) this.onChange();
+  }
+
   private read(): boolean {
     try {
-      if (!existsSync(SERVICES_FILE)) {
+      if (!existsSync(this.file)) {
         const had = this.services.length > 0;
         this.services = [];
         this.mtime = 0;
         return had;
       }
-      const m = statSync(SERVICES_FILE).mtimeMs;
+      const m = statSync(this.file).mtimeMs;
       if (m === this.mtime) return false;
       this.mtime = m;
-      const f = JSON.parse(readFileSync(SERVICES_FILE, 'utf8')) as DevCatzServicesFile;
+      const f = JSON.parse(readFileSync(this.file, 'utf8')) as DevCatzServicesFile;
       this.services = Array.isArray(f.services) ? f.services.filter((s) => s && typeof s.id === 'string') : [];
       return true;
     } catch (e) {
-      console.warn('DevCatz services.json could not be read:', (e as Error).message);
+      console.warn(`${this.app} services.json could not be read:`, (e as Error).message);
       return false;
     }
   }
 
   /** fs.watch on the folder (the file is replaced atomically), plus a slow poll for the first write. */
   private follow(): void {
-    const dir = dirname(SERVICES_FILE);
+    const dir = dirname(this.file);
     const arm = () => {
       if (this.watcher || !existsSync(dir)) return;
       try {
