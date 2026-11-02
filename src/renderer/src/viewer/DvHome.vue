@@ -92,6 +92,14 @@ function toggleSection(sec: Section) {
   if (!sec.group) return listView.toggle(sec.key);
   void saveLayout({ ...layout.value, groups: layout.value.groups.map((g) => (g.name === sec.group ? { ...g, collapsed: !g.collapsed } : g)) });
 }
+
+// ---- expand / collapse all (as DoCatz and DevCatz): the user's groups through the layout, the rest through the list view
+const anyOpen = computed(() => sections.value.some((s) => !s.collapsed));
+function setAll(open: boolean) {
+  for (const s of sections.value) if (!s.group && s.collapsed === open) listView.toggle(s.key);
+  const groups = new Set(sections.value.filter((s) => s.group && s.collapsed === open).map((s) => s.group));
+  if (groups.size) void saveLayout({ ...layout.value, groups: layout.value.groups.map((g) => (groups.has(g.name) ? { ...g, collapsed: !open } : g)) });
+}
 function setFavorite(id: string, on: boolean) {
   const f = layout.value.favorites.filter((x) => x !== id);
   void saveLayout({ ...layout.value, favorites: on ? [...f, id] : f });
@@ -455,6 +463,10 @@ async function keep(c: DvConnection) {
           <svg viewBox="0 0 20 20" class="size-4 opacity-50" fill="currentColor"><path d="M8.5 3a5.5 5.5 0 1 0 3.4 9.8l3.6 3.6a1 1 0 0 0 1.4-1.4l-3.6-3.6A5.5 5.5 0 0 0 8.5 3ZM5 8.5a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z" /></svg>
           <input v-model="filter" class="grow" placeholder="Find a connection" spellcheck="false" />
         </label>
+        <button v-if="sections.length > 1 && !filter" type="button" class="btn btn-ghost btn-sm btn-square" :title="anyOpen ? 'Collapse all: only the section names' : 'Expand all: every section open'" @click="setAll(!anyOpen)">
+          <svg v-if="anyOpen" class="size-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 2.22a.75.75 0 0 1 1.06 0L10 5.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 3.28a.75.75 0 0 1 0-1.06Zm0 15.56a.75.75 0 0 0 1.06 0L10 14.06l3.72 3.72a.75.75 0 1 0 1.06-1.06l-4.25-4.25a.75.75 0 0 0-1.06 0l-4.25 4.25a.75.75 0 0 0 0 1.06Z" clip-rule="evenodd" /></svg>
+          <svg v-else class="size-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 2.75a.75.75 0 0 1 .53.22l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 4.56 6.28 8.28a.75.75 0 0 1-1.06-1.06l4.25-4.25a.75.75 0 0 1 .53-.22Zm-4.78 9.97a.75.75 0 0 1 1.06 0L10 16.44l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0l-4.25-4.25a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+        </button>
         <PopMenu :items="listView.items.value" align="end" :width="260">
           <button type="button" class="btn btn-ghost btn-sm btn-square" :class="{ 'text-primary': listView.custom.value }" title="Sort and group">
             <svg class="size-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2.5 5.25A.75.75 0 0 1 3.25 4.5h13.5a.75.75 0 0 1 0 1.5H3.25a.75.75 0 0 1-.75-.75Zm2 4A.75.75 0 0 1 5.25 8.5h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75Zm2 4a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5a.75.75 0 0 1-.75-.75Z" /></svg>
