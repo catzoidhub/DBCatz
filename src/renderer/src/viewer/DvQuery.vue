@@ -10,7 +10,7 @@ import DvPrompt from './DvPrompt.vue';
 import DvReplyViewer from './DvReplyViewer.vue';
 import { structured } from './pretty';
 import type { Language } from './highlight';
-import { redisComplete, sqlComplete } from './complete';
+import { esComplete, mongoComplete, redisComplete, sqlComplete } from './complete';
 import { askWrite, fmtMs, fmtNum, formatSql, history, historyKey, isKv, isProd, isReadOnly, isSql, logActivity, remember, words } from './viewer';
 import { statementKind } from '@shared/dbsafety';
 import { splitStatements as splitSqlStatements } from '@shared/sqlsplit';
@@ -83,7 +83,13 @@ const complete = isSql(e)
       sqlComplete(text, cursor, { engine: e, tables: names.value, columns: (t) => columnCache.get(t), need: (t) => setTimeout(() => needColumns(t)) }, explicit)
   : isKv(e)
     ? (text: string, cursor: number, explicit: boolean) => redisComplete(text, cursor, { keys: keysFor }, explicit)
-    : null;
+    : e === 'mongodb'
+      ? (text: string, cursor: number, explicit: boolean) =>
+          mongoComplete(text, cursor, { engine: e, tables: names.value, columns: (t) => columnCache.get(t), need: (t) => setTimeout(() => needColumns(t)) }, explicit)
+      : e === 'elasticsearch'
+        ? (text: string, cursor: number, explicit: boolean) =>
+            esComplete(text, cursor, { engine: e, tables: names.value, columns: (t) => columnCache.get(t), need: (t) => setTimeout(() => needColumns(t)) }, explicit)
+        : null;
 // Tables can change (created, dropped): their columns are read again when next needed.
 watch(
   () => props.tables,

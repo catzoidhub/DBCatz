@@ -391,3 +391,342 @@ export function redisComplete(text: string, cursor: number, ctx: RedisContext, e
   const list = items.slice(0, 40).map(({ s: _s, ...rest }) => rest);
   return list.length ? { from, to, items: list } : null;
 }
+
+// ---------------------------------------------------------------- MongoDB
+
+/** Collection methods the query tab runs (nosql.ts MongoDriver.query), with their arguments. */
+const MONGO_METHODS: Record<string, string> = {
+  find: 'filter, projection',
+  findOne: 'filter',
+  aggregate: '[stages]',
+  countDocuments: 'filter',
+  estimatedDocumentCount: '',
+  distinct: "'field', filter",
+  insertOne: 'document',
+  insertMany: '[documents]',
+  updateOne: 'filter, update, options',
+  updateMany: 'filter, update, options',
+  replaceOne: 'filter, document',
+  deleteOne: 'filter',
+  deleteMany: 'filter',
+  createIndex: 'keys, options',
+  dropIndex: "'name'",
+  getIndexes: '',
+  drop: '',
+};
+/** What can follow find(…). */
+const MONGO_CURSOR: Record<string, string> = { sort: '{ field: 1 | -1 }', limit: 'n', skip: 'n', project: '{ field: 1 }' };
+const MONGO_QUERY_OPS: Record<string, string> = {
+  $eq: 'equal', $ne: 'not equal', $gt: 'greater than', $gte: 'greater or equal', $lt: 'less than', $lte: 'less or equal', $in: '[values]', $nin: 'not in [values]',
+  $and: '[conditions]', $or: '[conditions]', $nor: '[conditions]', $not: '{ condition }', $exists: 'true | false', $type: "'string' …", $regex: "'pattern'", $options: "'i'",
+  $elemMatch: '{ condition }', $size: 'array length', $all: '[values]', $expr: '{ expression }', $text: '{ $search }',
+};
+const MONGO_UPDATE_OPS: Record<string, string> = {
+  $set: '{ field: value }', $unset: "{ field: '' }", $inc: '{ field: n }', $mul: '{ field: n }', $rename: "{ field: 'new' }", $min: '{ field: value }', $max: '{ field: value }',
+  $currentDate: '{ field: true }', $setOnInsert: '{ field: value }', $push: '{ field: value }', $addToSet: '{ field: value }', $pull: '{ field: condition }', $pop: '{ field: 1 | -1 }',
+};
+const MONGO_STAGES: Record<string, string> = {
+  $match: '{ filter }', $group: "{ _id: '$field', n: { $sum: 1 } }", $project: '{ field: 1 }', $sort: '{ field: 1 | -1 }', $limit: 'n', $skip: 'n', $count: "'name'",
+  $unwind: "'$field'", $lookup: '{ from, localField, foreignField, as }', $addFields: '{ field: expression }', $set: '{ field: expression }', $unset: "'field'",
+  $replaceRoot: '{ newRoot }', $facet: '{ name: [stages] }', $bucket: '{ groupBy, boundaries }', $sample: '{ size: n }', $sortByCount: "'$field'", $out: "'collection'",
+};
+const MONGO_EXPR_OPS: Record<string, string> = {
+  $sum: 'total', $avg: 'average', $min: 'smallest', $max: 'largest', $first: 'first', $last: 'last', $push: 'array', $addToSet: 'set', $count: 'count',
+  $concat: '[strings]', $toLower: 'text', $toUpper: 'text', $cond: '{ if, then, else }', $ifNull: '[value, fallback]', $size: 'array length', $dateToString: '{ format, date }',
+  $eq: '[a, b]', $gt: '[a, b]', $lt: '[a, b]', $and: '[…]', $or: '[…]',
+};
+
+/** A statement starts on a line beginning with db. or { (as MongoDriver.exec splits them). */
+function mongoStatementStart(text: string, cursor: number): number {
+  let i = cursor;
+  while (i > 0) {
+    const nl = text.lastIndexOf('\n', i - 1);
+    const lineStart = nl + 1;
+    if (/^\s*(db\.|\{)/.test(text.slice(lineStart, cursor))) return lineStart;
+    if (nl < 0) return 0;
+    i = nl;
+  }
+  return 0;
+}
+
+/**
+ * Suggestions for the mongosh-like query tab: collections after `db.`, methods after `db.<collection>.`, sort / limit …
+ * after find(…), and inside the arguments the collection's fields (read from a sample of documents), query and
+ * update operators, and aggregation stages.
+ */
+export function mongoComplete(text: string, cursor: number, ctx: CompleteContext, explicit = false): Completion | null {
+  const start = mongoStatementStart(text, cursor);
+  const before = text.slice(start, cursor);
+  const word = /[\w$]*$/.exec(before)?.[0] ?? '';
+  const from = cursor - word.length;
+  const to = cursor + (/^[\w$]*/.exec(text.slice(cursor))?.[0] ?? '').length;
+  const head = before.slice(0, before.length - word.length);
+  const prevChar = head.trimEnd().slice(-1);
+  const items: (Suggestion & { s: number })[] = [];
+  const add = (sug: Suggestion) => {
+    const s = score(sug.label, word);
+    if (s > 0 && !items.some((i) => i.label === sug.label && i.kind === sug.kind)) items.push({ ...sug, s });
+  };
+  const fieldsOf = (c: string) => {
+    const cols = ctx.columns(c);
+    if (!cols) ctx.need(c);
+    return cols ?? [];
+  };
+  const finish = (): Completion | null => {
+    // Same score: fields first, then the lists' own order (most used first).
+    const order: Record<SuggestKind, number> = { column: 0, table: 1, function: 2, keyword: 3, option: 4, key: 5 };
+    items.sort((a, b) => b.s - a.s || order[a.kind] - order[b.kind]);
+    const list = items.slice(0, 40).map(({ s: _s, ...rest }) => rest);
+    return list.length ? { from, to, items: list } : null;
+  };
+
+  // db.<collection>
+  if (/^\s*db\.$/.test(head)) {
+    if (!word && !explicit && prevChar !== '.') return null;
+    for (const t of ctx.tables) add({ label: t, insert: /^[A-Za-z_$][\w$]*$/.test(t) ? `${t}.` : t, kind: 'table', detail: 'collection' });
+    return finish();
+  }
+  // db.<collection>.<method>
+  const m = /^\s*db\.([^(]+)\.$/.exec(head);
+  if (m) {
+    for (const [name, args] of Object.entries(MONGO_METHODS)) add({ label: name, insert: `${name}(`, kind: 'function', detail: args ? `(${args})` : '()' });
+    return finish();
+  }
+  // The start of a statement: db.
+  if (!head.trim()) {
+    if (!word && !explicit) return null;
+    add({ label: 'db', insert: 'db.', kind: 'keyword', detail: 'db.<collection>.<method>(…)' });
+    return finish();
+  }
+
+  const call = /^\s*db\.(.+?)\.(\w+)\(/.exec(head);
+  if (!call) return null;
+  const [, collection, method] = call;
+  // Walk the arguments: strings skipped, brackets on a stack, commas at the call's own level counted.
+  const rest = head.slice(call[0].length);
+  const stack: string[] = [];
+  let arg = 0;
+  let closed = false;
+  let quote = '';
+  for (let i = 0; i < rest.length; i++) {
+    const ch = rest[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '{' || ch === '[' || ch === '(') stack.push(ch);
+    else if (ch === '}' || ch === ']' || ch === ')') {
+      if (stack.length) stack.pop();
+      else closed = true; // the call's own ')'
+    } else if (ch === ',' && !stack.length && !closed) arg++;
+  }
+  if (quote) return null;
+
+  // After find(…): .sort( .limit( …
+  if (closed) {
+    if (!/\.$/.test(head) || method !== 'find') return null;
+    for (const [name, args] of Object.entries(MONGO_CURSOR)) add({ label: name, insert: `${name}(`, kind: 'function', detail: `(${args})` });
+    return finish();
+  }
+
+  const top = stack[stack.length - 1];
+  const keySlot = top === '{' && (prevChar === '{' || prevChar === ',');
+  const valueSlot = prevChar === ':' || (top === '[' && (prevChar === '[' || prevChar === ','));
+  if (!word && !explicit && prevChar !== '{') return null;
+
+  if (keySlot) {
+    if (word.startsWith('$') || !word) {
+      if (method === 'aggregate' && stack.length === 2 && stack[0] === '[') for (const [k, d] of Object.entries(MONGO_STAGES)) add({ label: k, insert: `${k}: `, kind: 'keyword', detail: d });
+      else if (/^(update|replace)/.test(method) && arg === 1 && stack.length === 1) for (const [k, d] of Object.entries(MONGO_UPDATE_OPS)) add({ label: k, insert: `${k}: `, kind: 'keyword', detail: d });
+      else {
+        for (const [k, d] of Object.entries(MONGO_QUERY_OPS)) add({ label: k, insert: `${k}: `, kind: 'keyword', detail: d });
+        if (method === 'aggregate') for (const [k, d] of Object.entries(MONGO_EXPR_OPS)) add({ label: k, insert: `${k}: `, kind: 'function', detail: d });
+      }
+    }
+    if (!word.startsWith('$') && !(method === 'aggregate' && stack.length === 2)) {
+      for (const f of fieldsOf(collection)) add({ label: f.name, insert: /^[A-Za-z_$][\w$]*$/.test(f.name) ? `${f.name}: ` : `${JSON.stringify(f.name)}: `, kind: 'column', detail: f.type });
+    }
+    return finish();
+  }
+  // '$field' references in aggregation expressions.
+  if (valueSlot && method === 'aggregate' && word.startsWith('$')) {
+    for (const f of fieldsOf(collection)) add({ label: `$${f.name}`, insert: `'$${f.name}'`, kind: 'column', detail: f.type });
+    for (const [k, d] of Object.entries(MONGO_EXPR_OPS)) add({ label: k, insert: `{ ${k}: `, kind: 'function', detail: d });
+    return finish();
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------- Elasticsearch
+
+const ES_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD'];
+/** Paths without an index. */
+const ES_ROOT_PATHS: Record<string, string> = { '_cat/indices?v': 'every index', '_cluster/health': 'cluster state', '_search': 'search every index', '_cat/aliases?v': 'aliases', '_nodes/stats': 'node stats' };
+/** What can follow /<index>/. */
+const ES_INDEX_PATHS: Record<string, string> = {
+  _search: 'search', _count: 'count documents', _doc: '_doc/<id>: one document', _mapping: 'fields and types', _settings: 'index settings',
+  _update: '_update/<id>: change one document', _delete_by_query: 'delete what a query finds', _update_by_query: 'change what a query finds', _refresh: 'make writes searchable',
+};
+const ES_BODY: Record<string, string> = { query: '{ … }', size: 'how many hits', from: 'skip', sort: '[{ field: "asc" }]', _source: '[fields]', aggs: '{ name: { … } }', track_total_hits: 'true', highlight: '{ fields }' };
+const ES_QUERIES: Record<string, string> = {
+  match: '{ field: "text" }', match_phrase: '{ field: "words in order" }', multi_match: '{ query, fields }', term: '{ field: value }', terms: '{ field: [values] }',
+  range: '{ field: { gte, lte } }', bool: '{ must, should, filter, must_not }', exists: '{ field }', match_all: '{}', wildcard: '{ field: "a*" }', prefix: '{ field: "ab" }',
+  query_string: '{ query: "a AND b" }', ids: '{ values: [] }', nested: '{ path, query }',
+};
+const ES_BOOL: Record<string, string> = { must: '[queries]: must match, scored', filter: '[queries]: must match, not scored', should: '[queries]: any may match', must_not: '[queries]: must not match', minimum_should_match: 'n' };
+const ES_RANGE: Record<string, string> = { gte: '≥', gt: '>', lte: '≤', lt: '<', format: 'date format' };
+const ES_AGGS: Record<string, string> = { terms: '{ field, size }', avg: '{ field }', sum: '{ field }', min: '{ field }', max: '{ field }', value_count: '{ field }', cardinality: '{ field }', date_histogram: '{ field, calendar_interval }', histogram: '{ field, interval }', filter: '{ query }', top_hits: '{ size }' };
+const ES_AGG_PARAMS: Record<string, string> = { field: '"field"', size: 'n', order: '{ _count: "desc" }', calendar_interval: '"day" | "month"', interval: 'n', missing: 'value' };
+/** Query types whose object is keyed by field. */
+const ES_FIELD_KEYED = /^(match|match_phrase|match_phrase_prefix|term|terms|range|wildcard|prefix|fuzzy|regexp|sort|properties)$/;
+
+/**
+ * Suggestions for the Elasticsearch request tab: the method and path on a request's first line (index names, then
+ * _search, _doc …), and in the JSON body the keys that fit where the cursor is (query types under query, must / filter
+ * under bool, gte / lte under a range field, aggregation types under aggs) and the index's fields from its mapping.
+ */
+export function esComplete(text: string, cursor: number, ctx: CompleteContext, explicit = false): Completion | null {
+  const lineStart = text.lastIndexOf('\n', cursor - 1) + 1;
+  const line = text.slice(lineStart, cursor);
+  const items: (Suggestion & { s: number })[] = [];
+  let word = '';
+  const add = (sug: Suggestion) => {
+    const s = score(sug.label, word);
+    if (s > 0 && !items.some((i) => i.label === sug.label && i.kind === sug.kind)) items.push({ ...sug, s });
+  };
+  const fieldsOf = (index: string | null) => {
+    if (!index) return [];
+    const cols = ctx.columns(index);
+    if (!cols) ctx.need(index);
+    return (cols ?? []).filter((c) => c.name !== '_id');
+  };
+  const done = (from: number, to: number): Completion | null => {
+    const order: Record<SuggestKind, number> = { column: 0, table: 1, function: 2, keyword: 3, option: 4, key: 5 };
+    items.sort((a, b) => b.s - a.s || order[a.kind] - order[b.kind]);
+    const list = items.slice(0, 40).map(({ s: _s, ...rest }) => rest);
+    return list.length ? { from, to, items: list } : null;
+  };
+
+  // The request line: METHOD /path
+  const reqLine = /^\s*([A-Za-z]*)$/.exec(line) && !/^\s*[{["]/.test(line);
+  if (reqLine) {
+    word = line.trim();
+    if (!word && !explicit) return null;
+    for (const m of ES_METHODS) add({ label: m, insert: `${m} /`, kind: 'keyword' });
+    return done(cursor - word.length, cursor + (/^[A-Za-z]*/.exec(text.slice(cursor))?.[0] ?? '').length);
+  }
+  const path = /^\s*(?:GET|POST|PUT|DELETE|HEAD)\s+(\/?)([^\s]*)$/i.exec(line);
+  if (path) {
+    const p = path[2];
+    const slash = p.lastIndexOf('/');
+    word = p.slice(slash + 1);
+    const from = cursor - word.length;
+    const to = cursor + (/^[^\s/]*/.exec(text.slice(cursor))?.[0] ?? '').length;
+    if (slash < 0) {
+      for (const t of ctx.tables) add({ label: t, insert: `${t}/`, kind: 'table', detail: 'index' });
+      for (const [k, d] of Object.entries(ES_ROOT_PATHS)) add({ label: k, insert: k, kind: 'keyword', detail: d });
+    } else if (slash === p.indexOf('/') && !p.startsWith('_')) {
+      for (const [k, d] of Object.entries(ES_INDEX_PATHS)) add({ label: k, insert: k === '_doc' || k === '_update' ? `${k}/` : k, kind: 'keyword', detail: d });
+    }
+    if (!word && !explicit && !/\/$/.test(line)) return null;
+    return done(from, to);
+  }
+
+  // The JSON body: the request it belongs to is the last METHOD line above.
+  const reqAt = [...text.slice(0, lineStart).matchAll(/^\s*(GET|POST|PUT|DELETE|HEAD)\s+\/?(\S*)/gim)].pop();
+  if (!reqAt) return null;
+  const reqPath = reqAt[2];
+  const index = reqPath && !reqPath.startsWith('_') ? reqPath.split(/[/?]/)[0] : null;
+  const bodyStart = (reqAt.index ?? 0) + reqAt[0].length;
+  const before = text.slice(bodyStart, cursor);
+  const m = /("?)([\w.@$-]*)$/.exec(before)!;
+  word = m[2];
+  const quoted = m[1] === '"';
+  const from = cursor - word.length - (quoted ? 1 : 0);
+  const tail = /^[\w.@$-]*"?/.exec(text.slice(cursor))?.[0] ?? '';
+  const to = cursor + tail.length;
+  const head = before.slice(0, before.length - word.length - (quoted ? 1 : 0));
+
+  // Walk the JSON: each { or [ remembers the key it is the value of.
+  const stack: { ch: string; key: string | null }[] = [];
+  let lastToken: string | null = null;
+  let lastKey: string | null = null;
+  let prev = '';
+  for (let i = 0; i < head.length; i++) {
+    const ch = head[i];
+    if (/\s/.test(ch)) continue;
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < head.length && head[j] !== '"') j += head[j] === '\\' ? 2 : 1;
+      if (j >= head.length) return null; // inside a string value
+      lastToken = head.slice(i + 1, j);
+      i = j;
+      prev = 's';
+      continue;
+    }
+    if (/[\w$]/.test(ch)) {
+      const w = /^[\w$.-]+/.exec(head.slice(i))![0];
+      lastToken = w;
+      i += w.length - 1;
+      prev = 's';
+      continue;
+    }
+    if (ch === ':') lastKey = lastToken;
+    else if (ch === '{' || ch === '[') stack.push({ ch, key: prev === ':' ? lastKey : stack[stack.length - 1]?.key ?? null });
+    else if (ch === '}' || ch === ']') stack.pop();
+    prev = ch;
+  }
+  const top = stack[stack.length - 1];
+  const parent = top?.key ?? null;
+  const grand = stack.length > 1 ? stack[stack.length - 2].key : null;
+  const great = stack.length > 2 ? stack[stack.length - 3].key : null;
+  const key = (k: string, d: string, kind: SuggestKind = 'keyword') => add({ label: k, insert: `"${k}": `, kind, detail: d });
+  const fields = (asKey: boolean) => {
+    for (const f of fieldsOf(index)) add({ label: f.name, insert: asKey ? `"${f.name}": ` : `"${f.name}"`, kind: 'column', detail: f.type });
+  };
+  if (!word && !explicit && !quoted && prev !== '{') return null;
+
+  if (top?.ch === '{' && (prev === '{' || prev === ',')) {
+    const isMapping = /(^|\/)_mapping/.test(reqPath);
+    if (stack.length === 1 && !parent) {
+      if (isMapping) key('properties', '{ field: { type } }');
+      else if (/^PUT$/i.test(reqAt[1]) && !reqPath.includes('/')) {
+        key('mappings', '{ properties }');
+        key('settings', '{ number_of_shards }');
+      } else if (/\/(_doc|_create)\b/.test(reqPath) || /^(PUT|POST)$/i.test(reqAt[1]) && /\/_doc/.test(reqPath)) fields(true);
+      else if (/\/_update\//.test(reqPath)) key('doc', '{ field: value }');
+      else for (const [k, d] of Object.entries(ES_BODY)) key(k, d);
+    } else if (parent === 'query' || parent === 'filter' && grand !== 'aggs' || /^(must|should|must_not)$/.test(parent ?? '')) {
+      for (const [k, d] of Object.entries(ES_QUERIES)) key(k, d, 'function');
+    } else if (parent === 'bool') {
+      for (const [k, d] of Object.entries(ES_BOOL)) key(k, d);
+    } else if (grand === 'range') {
+      for (const [k, d] of Object.entries(ES_RANGE)) key(k, d, 'option');
+    } else if (parent === 'aggs' || parent === 'aggregations') {
+      return null; // a name of your own comes first
+    } else if (grand === 'aggs' || grand === 'aggregations') {
+      for (const [k, d] of Object.entries(ES_AGGS)) key(k, d, 'function');
+      key('aggs', 'sub-aggregations');
+    } else if (great === 'aggs' || great === 'aggregations') {
+      for (const [k, d] of Object.entries(ES_AGG_PARAMS)) key(k, d, 'option');
+    } else if (parent === 'exists') {
+      key('field', '"field"', 'option');
+    } else if (parent === 'doc' || ES_FIELD_KEYED.test(parent ?? '')) {
+      fields(true);
+    } else if (parent === 'properties' && grand === 'properties') return null;
+    else if (grand === 'properties') key('type', '"keyword" | "text" …', 'option');
+    return done(from, to);
+  }
+  // Values that name a field: "field": …, _source: [ … ], fields: [ … ]
+  if ((prev === ':' && lastKey === 'field') || (top?.ch === '[' && /^(_source|fields)$/.test(parent ?? '') && (prev === '[' || prev === ','))) {
+    fields(false);
+    return done(from, to);
+  }
+  if (prev === ':' && lastKey === 'type' && grand === 'properties') {
+    for (const t of ['keyword', 'text', 'integer', 'long', 'float', 'double', 'boolean', 'date', 'object', 'nested', 'geo_point', 'ip']) add({ label: t, insert: `"${t}"`, kind: 'option' });
+    return done(from, to);
+  }
+  return null;
+}
