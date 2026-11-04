@@ -121,7 +121,7 @@ const ASK_HELP = [
   'Connections and the app:',
   '- new-connection: {} — the new connection form. edit-connection: {} — the connection\'s form (not for DevCatz services). disconnect: {}.',
   '- open-devcatz: {} — opens the DevCatz app at this connection\'s service (its Database page, where it is started, stopped and configured). Only for connections marked as DevCatz services; propose it when such a service is stopped or the user asks to start, stop or change it. Never tell the user DBCatz cannot open DevCatz.',
-  '- set-theme: {theme: "system" | "light" | "dark"} (shared with all Catzoid apps). open-settings: {tab: "appearance" | "ai" | "updates" | "about"} (appearance = General: theme, crash reports; About: version, links to catzoid.com, Report a bug, Uninstall).',
+  '- set-theme: {theme: "system" | "light" | "dark"} (shared with all Catzoid apps). open-settings: {tab: "appearance" | "ai" | "mcatzp" | "updates" | "about"} (appearance = General: theme, crash reports; mcatzp = what AI assistants outside DBCatz may reach; About: version, links to catzoid.com, Report a bug, Uninstall).',
   'Safety:',
   '- READ-ONLY connections: only steps that read (open-*, filter-rows, write-query / run-query with reads, export, backup). Say that a change is not possible there.',
   '- PRODUCTION connections: prefer reading; propose a change only when the user clearly asks, and say in explanation that it is production.',

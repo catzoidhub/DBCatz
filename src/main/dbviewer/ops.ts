@@ -1,6 +1,9 @@
 import type { DvAlterOp, DvColumnDef, DvEngine, DvResult, DvRows, DvRowsQuery } from '@shared/types';
 import { DV_SQL } from '@shared/types';
-import { quoteIdent, quoteTable, splitStatements, type Driver } from './driver';
+import { splitQuery } from '@shared/sqlsplit';
+import { quoteIdent, quoteTable, type Driver } from './driver';
+
+export { splitQuery };
 
 /**
  * Grid operations and DDL for the SQL engines, built from SQL; document
@@ -87,7 +90,7 @@ export async function deleteRows(d: Driver, db: string, table: string, keys: Rec
 
 /** Runs a script statement by statement; an error stops at that statement. */
 export async function runQuery(d: Driver, db: string, text: string): Promise<DvResult[]> {
-  const statements = isSql(d) ? splitStatements(text) : d.engine === 'mongodb' ? text.split(/\n(?=db\.|\{)/).filter((s) => s.trim()) : d.engine === 'elasticsearch' ? text.split(/\n(?=(?:GET|POST|PUT|DELETE|HEAD)\s)/i).filter((s) => s.trim()) : text.split('\n').filter((s) => s.trim() && !s.trim().startsWith('#'));
+  const statements = splitQuery(d.engine, text);
   const out: DvResult[] = [];
   for (const statement of statements) {
     const t0 = Date.now();

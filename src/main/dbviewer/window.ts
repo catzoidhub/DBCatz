@@ -84,6 +84,14 @@ function titleBarOverlay(): { color: string; symbolColor: string; height: number
 }
 if (isWin) nativeTheme.on('updated', () => win && !win.isDestroyed() && win.setTitleBarOverlay(titleBarOverlay()));
 
+/** Brings the window up as it is, without changing what it shows; opens it when closed. */
+export function showViewer(): void {
+  if (win && !win.isDestroyed()) {
+    win.show();
+    win.focus();
+  } else openViewer(null);
+}
+
 export function openViewer(connId: string | null, db?: string, target: ViewerTarget = {}): void {
   if (win && !win.isDestroyed()) {
     win.show();

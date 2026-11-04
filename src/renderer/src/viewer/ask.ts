@@ -20,9 +20,9 @@ export async function runAsk(a: DvAskAction): Promise<string> {
   // Steps that need no connection.
   switch (a.kind) {
     case 'open-settings':
-      settingsTab.value = x.tab === 'ai' || x.tab === 'updates' || x.tab === 'about' ? x.tab : 'appearance';
+      settingsTab.value = x.tab === 'ai' || x.tab === 'mcatzp' || x.tab === 'updates' || x.tab === 'about' ? x.tab : 'appearance';
       showSettings.value = true;
-      return `Opened Settings → ${{ appearance: 'General', ai: 'AI', updates: 'Updates', about: 'About' }[settingsTab.value]}`;
+      return `Opened Settings → ${{ appearance: 'General', ai: 'AI', mcatzp: 'MCatzP', updates: 'Updates', about: 'About' }[settingsTab.value]}`;
     case 'set-theme': {
       const t = x.theme === 'light' || x.theme === 'dark' ? x.theme : x.theme === 'system' || x.theme === 'auto' ? 'system' : null;
       if (!t) throw new Error('The theme is Auto, Light or Dark');

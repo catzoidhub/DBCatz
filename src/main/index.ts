@@ -2,7 +2,7 @@ import { app, dialog, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
-import { applyMenu, appMenuPopup, menuKey, menuShortcuts, openViewer, setUpdateLabel, tableMenu, viewerWindow } from './dbviewer/window';
+import { applyMenu, appMenuPopup, menuKey, menuShortcuts, openViewer, setUpdateLabel, showViewer, tableMenu, viewerWindow } from './dbviewer/window';
 import { AppServices } from './devcatz';
 import { AskAi } from './ai';
 import { applySettings, migrateToShared, setAiKey, setSettings, settings } from './settings';
@@ -12,6 +12,9 @@ import { Reporter } from './reporter';
 import { uninstallPlan, uninstallRun } from './uninstall';
 import { writeBridge } from './bridge';
 import { openCatzoidApp, platformId } from './companion';
+import { Mcatzp } from './mcatzp';
+import * as mcatzpSetup from './mcatzp/install';
+import { MCATZP_TARGETS } from '@catzoid/mcatzp-host';
 
 /**
  * DBCatz — a database viewer for MySQL / MariaDB, PostgreSQL, SQLite, Redis /
@@ -36,6 +39,13 @@ const viewer = new DbViewerManager(devcatz, docatz);
 const ai = new AskAi(viewer);
 const updater = new Updater();
 const reporter = new Reporter();
+let mcatzp: Mcatzp;
+let mcatzpInstalling: AbortController | null = null;
+const clientId = (id: unknown) => {
+  const known = MCATZP_TARGETS.find((t) => t === id);
+  if (!known) throw new Error('Unknown client');
+  return known;
+};
 
 /** One link parameter: trimmed, bounded, no control characters; undefined when missing or unusable. */
 function text(v: string | null, max: number, keepEmpty = false): string | undefined {
@@ -88,7 +98,10 @@ app.on('activate', () => openViewer(null));
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
-app.on('before-quit', () => void viewer.closeAll());
+app.on('before-quit', () => {
+  mcatzp?.quit();
+  void viewer.closeAll();
+});
 
 /** A started job runs on; its end (and any error) reaches the window through the Jobs list. */
 function background(job: Promise<string>, path: string): string {
@@ -137,7 +150,14 @@ function api(): DbCatzApi {
         await viewer.closeAll();
       }),
     settings: async () => settings(),
-    setSettings: async (patch) => setSettings(patch),
+    setSettings: async (patch) => {
+      const next = setSettings(patch);
+      if (patch.mcatzp) {
+        if (patch.mcatzp.on !== undefined) await mcatzp.set(next.mcatzp.on);
+        mcatzp.scopesChanged();
+      }
+      return next;
+    },
     setAiKey: async (provider, key) => setAiKey(provider, key),
     aiModels: (provider) => ai.models(provider),
     aiProbe: (provider, models) => ai.probe(provider, models),
@@ -150,6 +170,38 @@ function api(): DbCatzApi {
     aiPreviewLog: (connId, req) => ai.previewLog(connId, req),
     aiPreview: (connId, db, req) => ai.preview(connId, db, req),
     aiForget: async (connId, db) => ai.forget(connId, db),
+    mcatzpActivity: async () => mcatzp.activity.list(),
+    mcatzpClearActivity: async () => mcatzp.activity.clear(),
+    mcatzpRevoke: (name) => mcatzp.revoke(String(name)),
+    mcatzpSetup: (askSite) => mcatzpSetup.setupState(askSite !== false),
+    mcatzpInstall: async () => {
+      if (mcatzpInstalling) throw new Error('MCatzP is being installed');
+      mcatzpInstalling = new AbortController();
+      const report = (p: Parameters<Parameters<typeof mcatzpSetup.install>[0]>[0] | null) => viewerWindow()?.webContents.send('viewer:mcatzpInstalling', p);
+      try {
+        report({ phase: 'download', received: 0, total: 0 });
+        await mcatzpSetup.install(report, mcatzpInstalling.signal);
+      } catch (e) {
+        // Cancel is an answer, not a failure.
+        if (!mcatzpInstalling?.signal.aborted) throw e;
+      } finally {
+        mcatzpInstalling = null;
+        report(null);
+      }
+      return mcatzpSetup.setupState();
+    },
+    mcatzpInstallCancel: async () => mcatzpInstalling?.abort(),
+    mcatzpTargets: () => mcatzpSetup.targets(),
+    mcatzpAddToClient: async (id) => {
+      await mcatzpSetup.addToClient(clientId(id));
+      return mcatzpSetup.targets();
+    },
+    mcatzpRemoveFromClient: async (id) => {
+      await mcatzpSetup.removeFromClient(clientId(id));
+      return mcatzpSetup.targets();
+    },
+    mcatzpPending: async () => mcatzp.pending(),
+    mcatzpAnswer: async (id, answer, typed) => mcatzp.answer(String(id), answer === 'once' || answer === 'session' ? answer : 'deny', typeof typed === 'string' ? typed : undefined),
     openUrl: async (url) => {
       // app:licenses — the third-party licences shipped inside the app (Catzoid #66), readable offline
       if (url === 'app:licenses') await shell.openPath(app.isPackaged ? join(process.resourcesPath, 'third-party-licenses.txt') : join(app.getAppPath(), 'resources', 'third-party-licenses.txt'));
@@ -220,6 +272,16 @@ app.whenReady().then(() => {
       return r;
     });
   const send = (channel: string, payload: unknown) => viewerWindow()?.webContents.send(channel, payload);
+  mcatzp = new Mcatzp(
+    api(),
+    viewer,
+    (ask) => {
+      if (ask) showViewer();
+      send('viewer:mcatzpAsk', ask);
+    },
+    () => send('viewer:settings', settings()),
+  );
+  void mcatzp.set(settings().mcatzp.on).catch(() => undefined);
   viewer.onJobs = (jobs) => send('viewer:jobs', jobs);
   viewer.onProgress = (p) => send('viewer:progress', p);
   viewer.onChange = () => {

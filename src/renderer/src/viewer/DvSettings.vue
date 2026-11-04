@@ -7,6 +7,7 @@ import DvNavButtons from './DvNavButtons.vue';
 import DvModelPicker from './DvModelPicker.vue';
 import DvAbout from './DvAbout.vue';
 import DvUpdates from './DvUpdates.vue';
+import McatzpSettings from './McatzpSettings.vue';
 
 /**
  * Settings, inside the window (gear in the top-right corner, ⌘,):
@@ -19,6 +20,7 @@ const tab = settingsTab;
 const TABS = [
   { id: 'appearance', label: 'General' },
   { id: 'ai', label: 'AI' },
+  { id: 'mcatzp', label: 'MCatzP' },
   { id: 'updates', label: 'Updates' },
   { id: 'about', label: 'About' },
 ] as const;
@@ -283,6 +285,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
             </div>
           </div>
         </template>
+
+        <!-- MCatzP -->
+        <McatzpSettings v-if="tab === 'mcatzp'" />
 
         <!-- Updates -->
         <DvUpdates v-if="tab === 'updates'" />

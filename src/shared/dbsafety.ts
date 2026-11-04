@@ -18,7 +18,7 @@ export interface StatementKind {
   reason: string | null;
 }
 
-const stripSql = (s: string) =>
+export const stripSql = (s: string) =>
   s
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/--[^\n]*/g, ' ')

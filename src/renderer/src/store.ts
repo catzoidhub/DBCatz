@@ -1,5 +1,5 @@
 import { computed, ref, watch } from 'vue';
-import type { DbCatzSettings, DbCatzSettingsPatch, DvAiFeature, DvReportKind, DvUpdateState, Theme } from '@shared/types';
+import type { DbCatzSettings, DbCatzSettingsPatch, DvAiFeature, DvReportKind, DvUpdateState, McatzpAsk, McatzpInstallProgress, Theme } from '@shared/types';
 
 /** The preload bridge (see src/preload/index.ts). */
 export const api = window.dbcatz;
@@ -43,7 +43,11 @@ export async function openDevCatzDownload(): Promise<void> {
   await api.openUrl(`${site}/download/devcatz/${info.platform}`);
 }
 /** The Settings tab to show (Ask DBCatz's open-settings sets it). */
-export const settingsTab = ref<'appearance' | 'ai' | 'updates' | 'about'>('appearance');
+export const settingsTab = ref<'appearance' | 'ai' | 'mcatzp' | 'updates' | 'about'>('appearance');
+
+/** A question from an MCP client waiting for the user (McatzpPairDialog), and Install MCatzP running in Settings. */
+export const mcatzpAsk = ref<McatzpAsk | null>(null);
+export const mcatzpInstalling = ref<McatzpInstallProgress | null>(null);
 
 /** In-app updates (Catzoid #54): the main process's state, and whether the update dialog is open. */
 export const update = ref<DvUpdateState | null>(null);

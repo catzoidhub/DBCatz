@@ -1,3 +1,5 @@
+import type { DbEngine } from './types';
+
 /**
  * Splits a script into statements on `;` outside quotes, comments and
  * PostgreSQL dollar quotes (good enough for the query editor and imports).
@@ -63,4 +65,12 @@ export function splitStatements(sql: string): string[] {
   if (cur.trim()) out.push(cur.trim());
   // A statement that is only comments is dropped.
   return out.filter((s) => s.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, '').trim());
+}
+
+/** A query box's text as the statements it runs, one by one: what a guard checks is what runs. */
+export function splitQuery(engine: DbEngine, text: string): string[] {
+  if (engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql' || engine === 'sqlite') return splitStatements(text);
+  if (engine === 'mongodb') return text.split(/\n(?=db\.|\{)/).filter((s) => s.trim());
+  if (engine === 'elasticsearch') return text.split(/\n(?=(?:GET|POST|PUT|DELETE|HEAD)\s)/i).filter((s) => s.trim());
+  return text.split('\n').filter((s) => s.trim() && !s.trim().startsWith('#'));
 }

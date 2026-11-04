@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { API_METHODS, type DbCatzApi, type DbCatzSettings, type DvAiProgress, type DvConnectProgress, type DvJob, type DvUpdateState } from '@shared/types';
+import { API_METHODS, type DbCatzApi, type DbCatzSettings, type DvAiProgress, type DvConnectProgress, type DvJob, type DvUpdateState, type McatzpAsk, type McatzpInstallProgress } from '@shared/types';
 
 const api = Object.fromEntries(API_METHODS.map((m) => [m, (...args: unknown[]) => ipcRenderer.invoke(`dbcatz:${m}`, ...args)])) as unknown as DbCatzApi;
 
@@ -36,6 +36,10 @@ const bridge = {
   onUpdate: (cb: (s: DvUpdateState) => void) => on('viewer:update', cb),
   /** Show the update dialog (the notification or the app menu's Update Available…). */
   onUpdateOpen: (cb: () => void) => on('viewer:updateOpen', cb),
+  /** A question from an MCP client waiting for the user (null: none left). */
+  onMcatzpAsk: (cb: (ask: McatzpAsk | null) => void) => on('viewer:mcatzpAsk', cb),
+  /** Install MCatzP running in Settings. */
+  onMcatzpInstalling: (cb: (p: McatzpInstallProgress | null) => void) => on('viewer:mcatzpInstalling', cb),
   /** The first error while Send crash reports was never answered: ask once. */
   onReportsAsk: (cb: () => void) => on('viewer:reportsAsk', cb),
 };

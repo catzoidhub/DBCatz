@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { safeStorage } from 'electron';
-import type { DbEngine, DevCatzService, DvAlterOp, DvAws, DvConnection, DvLayout, DvConnectionInput, DvConnectProgress, DvExportOptions, DvImportOptions, DvJob, DvMethod, DvGridPrefs, DvOptions, DvSavedFilter, DvSavedQuery, DvDbPrefs, DvSsh, DvVault, DbCatzApi as HerdApi } from '@shared/types';
+import type { DbEngine, DevCatzService, DvResult, DvAlterOp, DvAws, DvConnection, DvLayout, DvConnectionInput, DvConnectProgress, DvExportOptions, DvImportOptions, DvJob, DvMethod, DvGridPrefs, DvOptions, DvSavedFilter, DvSavedQuery, DvDbPrefs, DvSsh, DvVault, DbCatzApi as HerdApi } from '@shared/types';
 import { DV_DEFAULT_OPTIONS, DV_KEYVALUE } from '@shared/types';
 import type { AppServices } from '../devcatz';
 import { parseDbUrl } from '@shared/dburl';
@@ -12,7 +12,6 @@ import { establish, stepsOf, type Opened, type Plan, type Report } from './conne
 import { awsProfiles, sshKeys } from './remote';
 import { analyzeAlter, analyzeTableRemoval } from './safety';
 import { statementKind } from '@shared/dbsafety';
-import { splitStatements } from './driver';
 import * as ops from './ops';
 import { dropTables, truncateTables } from './bulk';
 import { backupTo, exportTo, importFrom, type Progress } from './transfer';
@@ -69,6 +68,8 @@ export class DbViewerManager {
   private attempts = new Map<string, AbortController>();
   /** Opening in progress per connection (several calls wait for one attempt). */
   private opening = new Map<string, Promise<Open>>();
+  /** MCatzP's own connections for queries, read-only on the server too (MySQL, MariaDB, PostgreSQL). */
+  private readers = new Map<string, Promise<Open>>();
   private jobs: DvJob[] = [];
   onJobs: (jobs: DvJob[]) => void = () => undefined;
   onProgress: (p: DvConnectProgress) => void = () => undefined;
@@ -275,7 +276,7 @@ export class DbViewerManager {
    */
   servicesChanged(): void {
     const live = new Set(this.feeds().flatMap(([prefix, feed]) => feed.list().filter((s) => s.running || s.engine === 'sqlite').map((s) => `${prefix}${s.id}`)));
-    for (const id of [...this.drivers.keys()]) if (this.isService(id) && !live.has(id)) this.release(id);
+    for (const id of [...this.drivers.keys(), ...this.readers.keys()]) if (this.isService(id) && !live.has(id)) this.release(id);
     this.onChange();
   }
 
@@ -315,7 +316,62 @@ export class DbViewerManager {
   release(id: string): void {
     const open = this.drivers.get(id);
     if (open) this.closeOpen(open);
+    this.releaseReader(id);
     if (this.drivers.delete(id)) this.onChange();
+  }
+
+  private releaseReader(id: string): void {
+    const r = this.readers.get(id);
+    this.readers.delete(id);
+    void r?.then((o) => this.closeOpen(o)).catch(() => undefined);
+  }
+
+  /** The switch went off: nothing stays open for MCatzP. */
+  closeReaders(): void {
+    for (const id of [...this.readers.keys()]) this.releaseReader(id);
+  }
+
+  /** A connection of its own, read-only for the whole session: the guard on the text is not the only thing in the way. */
+  private reader(id: string): Promise<Driver> {
+    const base = this.planOf(id);
+    const plan: Plan = { ...base, options: { ...base.options, mode: 'readonly' } };
+    const key = this.keyOf(plan);
+    const cur = this.readers.get(id);
+    return (async () => {
+      const known = await cur?.catch(() => null);
+      if (known && known.key === key && (!known.renewAt || known.renewAt > Date.now())) return known.driver;
+      if (known) this.closeOpen(known);
+      const p = establish(plan, () => undefined, new AbortController().signal).then((o) => ({ ...o, key }));
+      this.readers.set(id, p);
+      p.catch(() => this.readers.get(id) === p && this.readers.delete(id));
+      return (await p).driver;
+    })();
+  }
+
+  /**
+   * A query for MCatzP, already checked to be a read (mcatzp/readquery.ts). Stops waiting at the time limit or when the
+   * client gives up, and drops that connection, so a runaway statement does not hold the next one up.
+   */
+  async readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal): Promise<DvResult[]> {
+    const engine = this.planOf(id).engine;
+    const server = engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql';
+    const d = await (server ? this.reader(id) : this.driver(id));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    const stopped = new Promise<never>((_, no) => {
+      timer = setTimeout(() => no(new Error(`Stopped after ${Math.round(timeoutMs / 1000)} s: narrow the query, or raise timeout_seconds`)), timeoutMs);
+      onAbort = () => no(new Error('Cancelled'));
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try {
+      return await Promise.race([ops.runQuery(d, db, text), stopped]);
+    } catch (e) {
+      if (server) this.releaseReader(id);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+      if (onAbort) signal.removeEventListener('abort', onAbort);
+    }
   }
 
   // ---------------------------------------------------------------- list layout
@@ -738,8 +794,7 @@ export class DbViewerManager {
   /** Read-only: only statements that read. */
   private readOnlyQuery(id: string, engine: DbEngine, text: string): void {
     if (this.modeOf(id) !== 'readonly') return;
-    const parts = engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql' || engine === 'sqlite' ? splitStatements(text) : engine === 'mongodb' ? text.split(/\n(?=db\.|\{)/) : engine === 'elasticsearch' ? text.split(/\n(?=(?:GET|POST|PUT|DELETE|HEAD)\s)/i) : text.split('\n');
-    for (const p of parts.map((x) => x.trim()).filter((x) => x && !x.startsWith('#'))) {
+    for (const p of ops.splitQuery(engine, text).map((x) => x.trim())) {
       if (!statementKind(engine, p).read) throw new Error(`Read-only connection: "${p.replace(/\s+/g, ' ').slice(0, 80)}" would change data or structure`);
     }
   }
@@ -762,6 +817,7 @@ export class DbViewerManager {
 
   async closeAll(): Promise<void> {
     for (const c of this.attempts.values()) c.abort();
+    this.closeReaders();
     await Promise.all([...this.drivers.values()].map(async (d) => {
       await d.driver.close().catch(() => undefined);
       d.tunnel?.close();

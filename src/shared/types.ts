@@ -44,6 +44,69 @@ export type Theme = 'system' | 'light' | 'dark';
 export interface DbCatzSettings {
   theme: Theme;
   ai: DvAiSettings;
+  mcatzp: DvMcatzpSettings;
+}
+
+/** Settings → MCatzP: the local channel an AI client reaches DBCatz through. DBCatz's own, per computer. */
+export interface DvMcatzpSettings {
+  /** The switch. Off by default. */
+  on: boolean;
+  /** Every connection is shared, new ones too, except Production ones. */
+  all: boolean;
+  /** Connections shared one by one (ids); the only way to share a Production one. */
+  connections: string[];
+  /** Rows, query results and key values go out too. Off: only the structure. */
+  rows: boolean;
+  /** Approved clients, until Revoke. Set by the main process only. */
+  clients: { name: string; approvedAt: string }[];
+}
+
+export interface McatzpActivity {
+  time: string;
+  client: string;
+  method: string;
+  action?: string;
+  tier?: 'read' | 'change' | 'destructive';
+  outcome: 'ok' | 'refused' | 'declined' | 'failed';
+  reason?: string;
+}
+
+/** `pair`: may this client connect at all? `change`: may it do this (built from the real parameters)? */
+export type McatzpAsk =
+  | { id: string; kind: 'pair'; client: string; version: string | null }
+  | { id: string; kind: 'change'; client: string; title: string; facts: { label: string; value: string }[]; allowSession: boolean; /** Destructive: this must be typed to allow it. */ typeName?: string };
+
+/** The MCatzP program on this computer and what the site offers it (Settings → MCatzP). */
+export interface McatzpSetup {
+  path: string | null;
+  version: string | null;
+  /** `catzoid`: installed from here, updated from here. Others update their own way (Homebrew, npm). */
+  source: 'catzoid' | 'homebrew' | 'other' | null;
+  latest: string | null;
+  /** The site has no build for this computer. */
+  noBuild: boolean;
+  /** The site could not be asked. */
+  error: string | null;
+  /** The site was asked; until then latest and noBuild say nothing. */
+  checked: boolean;
+}
+/** An AI assistant MCatzP can be added to. */
+export interface McatzpTarget {
+  id: 'claude-code' | 'zcode' | 'claude-desktop' | 'cursor' | 'windsurf' | 'vscode' | 'cline' | 'gemini' | 'codex' | 'opencode' | 'copilot' | 'kiro' | 'antigravity' | 'qwen' | 'lmstudio' | 'roo' | 'amp' | 'warp';
+  label: string;
+  /** It is on this computer. */
+  found: boolean;
+  /** What its mcatzp entry runs; null when it has none. */
+  command: string | null;
+  /** The entry runs the copy in use. */
+  current: boolean;
+  /** The account signed in to it, when the assistant keeps that on this computer. */
+  account?: string;
+}
+export interface McatzpInstallProgress {
+  phase: 'download' | 'install';
+  received: number;
+  total: number;
 }
 
 /** Who writes queries for Ask AI. `openai-compatible` is any server speaking OpenAI's /chat/completions (LM Studio, vLLM, a company gateway). */
@@ -118,7 +181,7 @@ export interface DvLogAnswer {
   /** The fixed (or faster) statement, '' when there is none; opened in the Query tab, never run. */
   query: string;
 }
-export type DbCatzSettingsPatch = { theme?: Theme; ai?: Partial<Omit<DvAiSettings, 'keys'>> };
+export type DbCatzSettingsPatch = { theme?: Theme; ai?: Partial<Omit<DvAiSettings, 'keys'>>; mcatzp?: Partial<Omit<DvMcatzpSettings, 'clients'>> };
 
 /** Progress of a long task shown in the window (a shape DevCatz uses too). */
 export interface TaskProgress {
@@ -760,6 +823,24 @@ export interface DbCatzApi {
   aiPreview(connId: string, database: string, request: DvAiRequest): Promise<DvAiPreview>;
   /** Drops the cached schema (after ↻ or a structure change). */
   aiForget(connId: string, database: string): Promise<void>;
+  /** What MCatzP clients did, the newest first (names and outcomes only). */
+  mcatzpActivity(): Promise<McatzpActivity[]>;
+  mcatzpClearActivity(): Promise<void>;
+  /** Forgets a client and closes every connection (a new token): the others reconnect, this one asks again. */
+  mcatzpRevoke(name: string): Promise<void>;
+  /** Whether MCatzP is on this computer, and the version the site offers. */
+  mcatzpSetup(askSite?: boolean): Promise<McatzpSetup>;
+  /** Installs or updates MCatzP; progress as viewer:mcatzpInstalling events. */
+  mcatzpInstall(): Promise<McatzpSetup>;
+  mcatzpInstallCancel(): Promise<void>;
+  /** The AI assistants MCatzP can be added to. */
+  mcatzpTargets(): Promise<McatzpTarget[]>;
+  mcatzpAddToClient(id: McatzpTarget['id']): Promise<McatzpTarget[]>;
+  mcatzpRemoveFromClient(id: McatzpTarget['id']): Promise<McatzpTarget[]>;
+  /** The question waiting for the user, for a window that just opened; later ones come as viewer:mcatzpAsk events. */
+  mcatzpPending(): Promise<McatzpAsk | null>;
+  /** The answer to the question shown. */
+  mcatzpAnswer(id: string, answer: 'deny' | 'once' | 'session', typed?: string): Promise<void>;
   openUrl(url: string): Promise<void>;
   pickFile(title: string): Promise<string | null>;
   /** Opens DevCatz at a database service (devcatz://db/<id>) when it is installed. */
@@ -864,6 +945,6 @@ export interface DbCatzApi {
 
 /** Every method of the bridge, registered as `dbcatz:<name>` IPC handlers. */
 export const API_METHODS: (keyof DbCatzApi)[] = [
-  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
+  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'mcatzpActivity', 'mcatzpClearActivity', 'mcatzpRevoke', 'mcatzpSetup', 'mcatzpInstall', 'mcatzpInstallCancel', 'mcatzpTargets', 'mcatzpAddToClient', 'mcatzpRemoveFromClient', 'mcatzpPending', 'mcatzpAnswer', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
   'dvConnections', 'dvSaveConnection', 'dvDeleteConnection', 'dvTestConnection', 'dvServerInfo', 'dvCancelConnect', 'dvDisconnect', 'dvLayout', 'dvSetLayout', 'dvAwsProfiles', 'dvSshKeys', 'dvDatabases', 'dvTables', 'dvStructure', 'dvRows', 'dvUpdateRow', 'dvInsertRow', 'dvDeleteRows', 'dvQuery', 'dvCreateDatabase', 'dvCharsets', 'dvDropDatabase', 'dvCreateTable', 'dvAlterCheck', 'dvAlterTable', 'dvDropTable', 'dvTruncateTable', 'dvDuplicateTable', 'dvDropTables', 'dvTruncateTables', 'dvTypes', 'dvExport', 'dvImport', 'dvBackup', 'dvJobs', 'dvClearJobs', 'dvCancelJob', 'dvReveal', 'dvTableMenu', 'dvAppMenu', 'dvMenuShortcuts', 'dvMenuKey', 'dvPickSqlite', 'dvOpen', 'dvKeys', 'dvKey', 'dvKeySet', 'dvKeyDelete', 'dvKeyRename', 'dvFlush', 'dvSavedQueries', 'dvSaveQuery', 'dvDeleteQuery', 'dvGridPrefs', 'dvSetGridPrefs', 'dvDbPrefs', 'dvSetDbPrefs',
 ];

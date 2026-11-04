@@ -2,7 +2,7 @@
 import { currentOS, keyLabel } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection } from '@shared/types';
-import { aiOn, api, init, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
+import { aiOn, api, init, mcatzpAsk, mcatzpInstalling, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
 import { DB_LOGO } from '../db';
 import { writeAsk, isKv, isProd, isReadOnly, linkWhere, progress, active, closeOtherTabs, closeTab, connections, cycleTab, dispatch, duplicateTab, editing, jobs, openTab, refreshConnections, showJobs, tabs } from './viewer';
 import DvHome from './DvHome.vue';
@@ -13,6 +13,7 @@ import AskDbcatz from './AskDbcatz.vue';
 import CatMood from './CatMood.vue';
 import DvUpdateDialog from './DvUpdateDialog.vue';
 import DvReportDialog from './DvReportDialog.vue';
+import McatzpPairDialog from './McatzpPairDialog.vue';
 import DvWelcome from './DvWelcome.vue';
 import askMark from '../assets/logos/ask-catzoid.svg';
 import { back, changed, forward, goTo } from './nav';
@@ -45,6 +46,14 @@ onMounted(async () => {
   api.onViewerChanged(() => {
     void refreshConnections();
   });
+  api.onMcatzpAsk((ask) => {
+    mcatzpAsk.value = ask;
+  });
+  api.onMcatzpInstalling((p) => {
+    mcatzpInstalling.value = p;
+  });
+  // A question that came up before this window was there.
+  mcatzpAsk.value = await api.mcatzpPending();
   api.onViewerProgress((p) => {
     progress.set(p.token, p);
   });
@@ -238,6 +247,7 @@ function menuAct(fn: (id: string) => void) {
     <DvJobs v-if="showJobs" @close="showJobs = false" />
     <DvUpdateDialog v-if="ready && updateOpen" @close="updateOpen = false" />
     <DvReportDialog v-if="ready && reportOpen" :kind="reportOpen" @close="reportOpen = null" />
+    <McatzpPairDialog />
     <DvWelcome v-if="ready" />
 
     <!-- Asked once, after the first error: send crash reports? (Catzoid #65) -->

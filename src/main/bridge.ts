@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { chmodSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { BridgeEntry } from '@catzoid/mcatzp-host';
 import type { DvConnection } from '@shared/types';
 
 /**
@@ -43,23 +44,37 @@ function entry(c: DvConnection): BridgeConnection {
 }
 
 let last = '';
+let written: BridgeConnection[] | null = null;
+let mcatzp: BridgeEntry | null = null;
+
+function writeFile(): void {
+  if (!written) return;
+  try {
+    const file = bridgeFile();
+    const dir = join(file, '..');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    else chmodSync(dir, 0o700);
+    const doc = { schema: 1, app: 'DBCatz', version: app.getVersion(), updatedAt: Date.now(), connections: written, ...(mcatzp ? { mcatzp } : {}) };
+    const tmp = `${file}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(doc, null, 2) + '\n', { mode: 0o600 });
+    renameSync(tmp, file);
+  } catch (e) {
+    console.warn('bridge.json could not be written:', (e as Error).message);
+  }
+}
 
 /** Writes the file when the list changed (connections opened from a URL for this session are left out). */
 export function writeBridge(connections: DvConnection[]): void {
   const list = connections.filter((c) => !c.temporary).map(entry);
   const body = JSON.stringify(list);
   if (body === last) return;
-  try {
-    const file = bridgeFile();
-    const dir = join(file, '..');
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-    else chmodSync(dir, 0o700);
-    const doc = { schema: 1, app: 'DBCatz', version: app.getVersion(), updatedAt: Date.now(), connections: list };
-    const tmp = `${file}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(doc, null, 2) + '\n', { mode: 0o600 });
-    renameSync(tmp, file);
-    last = body;
-  } catch (e) {
-    console.warn('bridge.json could not be written:', (e as Error).message);
-  }
+  last = body;
+  written = list;
+  writeFile();
+}
+
+/** MCatzP's entry (MCatzP #4): how `mcatzp` finds this app's channel. Written at once when the switch flips. */
+export function setBridgeMcatzp(next: BridgeEntry): void {
+  mcatzp = next;
+  writeFile();
 }

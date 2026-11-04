@@ -1,5 +1,5 @@
 import { nativeTheme, safeStorage } from 'electron';
-import { DV_AI_DEFAULTS, DV_AI_FEATURES, DV_AI_PROVIDERS, type DvAiFeature, type DbCatzSettings, type DbCatzSettingsPatch, type DvAiProvider, type Theme } from '@shared/types';
+import { DV_AI_DEFAULTS, DV_AI_FEATURES, DV_AI_PROVIDERS, type DvAiFeature, type DbCatzSettings, type DbCatzSettingsPatch, type DvAiProvider, type DvMcatzpSettings, type Theme } from '@shared/types';
 import { store } from './store';
 import { readShared, setSharedKey, sharedKey, watchShared, writeShared } from './shared';
 
@@ -22,6 +22,12 @@ const FEATURES = DV_AI_FEATURES.map((f) => f.id);
 
 type Stored = Omit<DbCatzSettings, 'ai'> & { ai: Omit<DbCatzSettings['ai'], 'keys'> };
 
+const ids = (a: unknown) => (Array.isArray(a) ? [...new Set(a.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length < 300))] : []);
+function mcatzpOf(m: Partial<DvMcatzpSettings> | undefined): DvMcatzpSettings {
+  const clients = Array.isArray(m?.clients) ? m.clients.filter((c) => typeof c?.name === 'string' && typeof c?.approvedAt === 'string') : [];
+  return { on: m?.on === true, all: m?.all === true, connections: ids(m?.connections), rows: m?.rows !== false, clients };
+}
+
 /** DBCatz's own copy (config.json): the fallback, and the on / off switch. */
 function local(): Stored {
   const s = store.extra<Partial<Stored>>(KEY) ?? {};
@@ -29,6 +35,7 @@ function local(): Stored {
   return {
     theme: THEMES.includes(s.theme as Theme) ? (s.theme as Theme) : 'system',
     ai: { enabled: ai.enabled === true, provider: PROVIDERS.includes(ai.provider) ? ai.provider : 'anthropic', models: ai.models ?? {}, baseUrls: ai.baseUrls ?? {}, samples: Array.isArray(ai.samples) ? ai.samples.map(String) : [], off: Array.isArray(ai.off) ? ai.off.filter((f): f is DvAiFeature => FEATURES.includes(f)) : [] },
+    mcatzp: mcatzpOf(s.mcatzp),
   };
 }
 
@@ -40,6 +47,7 @@ function stored(): Stored {
   return {
     theme: sh.theme && THEMES.includes(sh.theme) ? sh.theme : s.theme,
     ai: { enabled: s.ai.enabled, provider: PROVIDERS.includes(provider) ? provider : 'anthropic', models: sh.ai?.models ?? s.ai.models, baseUrls: sh.ai?.baseUrls ?? s.ai.baseUrls, samples: s.ai.samples, off: s.ai.off },
+    mcatzp: s.mcatzp,
   };
 }
 
@@ -84,12 +92,26 @@ export function setSettings(patch: DbCatzSettingsPatch): DbCatzSettings {
       else delete s.ai.baseUrls[p as DvAiProvider];
     }
   }
+  const m = patch.mcatzp;
+  if (m) {
+    if (m.on !== undefined) s.mcatzp.on = m.on === true;
+    if (m.all !== undefined) s.mcatzp.all = m.all === true;
+    if (m.rows !== undefined) s.mcatzp.rows = m.rows === true;
+    if (m.connections !== undefined) s.mcatzp.connections = ids(m.connections);
+  }
   store.setExtra(KEY, s);
   // The theme and the connection are shared with DevCatz; Ask AI on / off is not.
   const conn = ai && (ai.provider !== undefined || ai.models !== undefined || ai.baseUrls !== undefined);
   if (patch.theme !== undefined || conn) writeShared({ ...(patch.theme !== undefined ? { theme: s.theme } : {}), ...(conn ? { ai: { provider: s.ai.provider, models: s.ai.models, baseUrls: s.ai.baseUrls } } : {}) });
   nativeTheme.themeSource = s.theme;
   return settings();
+}
+
+/** Approved MCatzP clients: only the main process changes them (a pairing answered, Revoke). */
+export function setMcatzpClients(clients: DvMcatzpSettings['clients']): void {
+  const s = stored();
+  s.mcatzp.clients = clients;
+  store.setExtra(KEY, s);
 }
 
 /** Saves (or with '' removes) a provider's key in the shared Keychain item; DBCatz's own old copy goes. */
