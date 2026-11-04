@@ -77,6 +77,8 @@ export interface Driver {
   dropTable?(db: string, table: string): Promise<void>;
   truncate?(db: string, table: string): Promise<void>;
   renameTable?(db: string, from: string, to: string): Promise<void>;
+  /** Lets go of one database before it is dropped. */
+  closeDatabase?(name: string): Promise<void>;
   duplicateTable?(db: string, from: string, to: string, withRows: boolean): Promise<void>;
   /** Elasticsearch: a new field in the index mapping (existing fields cannot change). */
   addField?(db: string, table: string, name: string, type: string): Promise<void>;
@@ -300,6 +302,12 @@ pg.types.setTypeParser(20, (v: string) => v); // int8 stays exact
 class PgDriver implements Driver {
   readonly engine: DvEngine = 'postgresql';
   private pools = new Map<string, pg.Pool>();
+  /** Closes the pool of one database: PostgreSQL refuses to drop a database while this very app has a session in it. */
+  async closeDatabase(name: string): Promise<void> {
+    const p = this.pools.get(name);
+    this.pools.delete(name);
+    await p?.end().catch(() => undefined);
+  }
   constructor(private s: ConnectSettings) {}
 
   private pool(db: string): pg.Pool {

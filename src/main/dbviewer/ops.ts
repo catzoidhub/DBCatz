@@ -129,6 +129,7 @@ export async function createDatabase(d: Driver, name: string, o?: { charset: str
 export async function dropDatabase(d: Driver, name: string) {
   if (d.dropDatabase) return d.dropDatabase(name);
   if (!isSql(d) || d.engine === 'sqlite') throw new Error('Database files are removed on the Database page');
+  await d.closeDatabase?.(name);
   await d.query('', `DROP DATABASE ${quoteIdent(d.engine, name)}`);
 }
 
