@@ -13,8 +13,11 @@ const SQL_WRITE = /\b(INSERT\s+INTO|DELETE\s+FROM|MERGE\s+INTO|UPDATE\s+\S+\s+SE
 /** Functions a SELECT can call with effects: settings, other sessions, files, sequences, locks, waiting. */
 const SQL_EFFECT = /\b(set_config|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|pg_sleep\w*|lo_\w+|dblink\w*|nextval|setval|load_file|sleep|benchmark|get_lock|load_extension|writefile|readfile)\s*\(/i;
 const PRAGMA_READ = /^PRAGMA\s+(\w+\.)?(table_info|table_xinfo|index_list|index_info|index_xinfo|foreign_key_list|table_list|database_list|collation_list|function_list)\b/i;
-/** Listed as reads for the user's own console, but no use here: other clients' details, the session's database, a wait. */
-const REDIS_NO = new Set(['CLIENT', 'SELECT', 'XREAD', 'MEMORY', 'SLOWLOG', 'COMMAND', 'ROLE']);
+/**
+ * Listed as reads for the user's own console, but not offered here: other clients' details, the session's database, a
+ * wait, and what gives values without the field names their masking goes by (get_key masks a hash field by field).
+ */
+const REDIS_NO = new Set(['CLIENT', 'SELECT', 'XREAD', 'MEMORY', 'SLOWLOG', 'COMMAND', 'ROLE', 'HVALS', 'HSCAN', 'HRANDFIELD', 'DUMP', 'EVAL_RO', 'XRANGE', 'XREVRANGE']);
 
 const no = (statement: string, why: string) => new Error(`run_read_query only reads: "${statement.replace(/\s+/g, ' ').slice(0, 80)}" ${why}`);
 

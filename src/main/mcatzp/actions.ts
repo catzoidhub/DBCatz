@@ -1,5 +1,5 @@
 import type { ActionContext, ActionDef, CallResult } from '@catzoid/mcatzp-host';
-import type { DbCatzApi, DvConnection, DvResult } from '@shared/types';
+import type { DbCatzApi, DbEngine, DvConnection, DvResult } from '@shared/types';
 import { DV_KEYVALUE } from '@shared/types';
 import { maskSecrets } from '@shared/mask';
 import { assertReadQuery } from './readquery';
@@ -67,13 +67,30 @@ export interface ReadQuery {
   readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal): Promise<DvResult[]>;
 }
 
-/** Query results for the client: cut at `max` rows, secret-looking columns masked. */
-export function resultsOut(results: DvResult[], max: number): unknown {
-  return results.map((r) => ({
-    statement: r.statement,
-    ...(r.error ? { error: maskSecrets(r.error) } : { columns: r.columns, rowCount: r.rows.length, ...(r.affected !== null ? { affected: r.affected } : {}), ...(r.rows.length > max ? { cutAt: max } : {}), ...rowsOut(r.columns, r.rows.slice(0, max)) }),
-    ms: r.ms,
-  }));
+/** A statement that works on something secret-looking under another name: an alias or a function hides the column's own name. */
+function hidesSecret(statement: string, columns: string[]): boolean {
+  if (!SECRET_NAME.test(statement.replace(/'(?:[^'\\]|\\.|'')*'/g, "''"))) return false;
+  return !columns.some((c) => SECRET_NAME.test(c)) || /\bAS\b|\(|\|\|/i.test(statement);
+}
+
+/** Redis / Valkey answer in one `reply` column: go by the key or field the command names, and by each field of HGETALL. */
+function redisRows(statement: string, rows: unknown[][]): unknown[][] {
+  const [cmd = '', ...args] = statement.trim().split(/\s+/);
+  if (args.some((a) => SECRET_NAME.test(a))) return rows.map(() => ['•••']);
+  if (cmd.toUpperCase() !== 'HGETALL') return rows;
+  return rows.map((r, i) => (i % 2 === 1 && SECRET_NAME.test(String(rows[i - 1]?.[0])) ? ['•••'] : r));
+}
+
+/** Query results for the client: cut at `max` rows, secrets masked by the name they go under. */
+export function resultsOut(results: DvResult[], max: number, engine: DbEngine): unknown {
+  const kv = DV_KEYVALUE.includes(engine);
+  return results.map((r) => {
+    if (r.error) return { statement: r.statement, error: maskSecrets(r.error), ms: r.ms };
+    const hidden = !kv && hidesSecret(r.statement, r.columns);
+    const page = (kv ? redisRows(r.statement, r.rows) : r.rows).slice(0, max);
+    const out = hidden ? { rows: page.map((row) => Object.fromEntries(r.columns.map((c, i) => [c, row[i] === null ? null : '•••']))), masked: r.columns } : rowsOut(r.columns, page);
+    return { statement: r.statement, columns: r.columns, rowCount: r.rows.length, ...(r.affected !== null ? { affected: r.affected } : {}), ...(r.rows.length > max ? { cutAt: max } : {}), ...out, ms: r.ms };
+  });
 }
 
 /** Tabs that live in the window's own state, read through it. */
@@ -122,7 +139,8 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes, w
     read('list_databases', 'List databases', 'The databases of a connection, with the ones the user starred and used lately.', OBJECT({ connection: CONNECTION }, ['connection']), async ({ connection }) => {
       const c = await conn(connection);
       const [databases, prefs] = await Promise.all([api.dvDatabases(c.id), api.dvDbPrefs(c.id)]);
-      return reply({ databases, starred: prefs.favorites, recent: prefs.recent });
+      // A star can outlive its database.
+      return reply({ databases, starred: prefs.favorites.filter((d) => databases.includes(d)), recent: prefs.recent.filter((d) => databases.includes(d)) });
     }),
     read('list_tables', 'List tables', 'Tables and views of a database (MongoDB: collections; Elasticsearch: indexes), with estimated rows and size when the engine reports them. Redis / Valkey have keys instead: list_keys.', OBJECT({ connection: CONNECTION, database: DATABASE }, ['connection', 'database']), async ({ connection, database }) => {
       const c = await conn(connection);
@@ -182,7 +200,7 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes, w
         const max = Number(maxRows ?? 100);
         const results = await viewer.readQuery(c.id, String(database), String(query), Number(timeout ?? 30) * 1000, ctx.signal);
         for (const r of results) logQuery(c.id, { text: r.statement, ms: r.ms, affected: r.affected, error: r.error });
-        return reply(resultsOut(results, max));
+        return reply(resultsOut(results, max, c.engine));
       },
     ),
     read(

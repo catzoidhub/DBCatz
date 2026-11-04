@@ -320,6 +320,16 @@ export class DbViewerManager {
     if (this.drivers.delete(id)) this.onChange();
   }
 
+  private async closeReader(id: string): Promise<void> {
+    const r = this.readers.get(id);
+    this.readers.delete(id);
+    const open = await r?.catch(() => null);
+    if (open) {
+      await open.driver.close().catch(() => undefined);
+      open.tunnel?.close();
+    }
+  }
+
   private releaseReader(id: string): void {
     const r = this.readers.get(id);
     this.readers.delete(id);
@@ -713,6 +723,8 @@ export class DbViewerManager {
       dvDropDatabase: async (id, name, confirm) => {
         this.writable(id, 'Drops');
         confirmed(name, confirm);
+        // MCatzP's read-only connection may still be in that database, and PostgreSQL refuses while anyone is.
+        await this.closeReader(id);
         await ops.dropDatabase(await D(id), name);
       },
       dvCreateTable: async (id, db, t, cols) => (this.writable(id, 'New tables'), ops.createTable(await D(id), db, t, cols)),

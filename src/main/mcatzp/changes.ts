@@ -119,7 +119,7 @@ export function changeActions(api: DbCatzApi, scopes: Scopes, logQuery: (connId:
         const c = await target(a.connection);
         const results = await api.dvQuery(c.id, String(a.database), String(a.query));
         for (const r of results) logQuery(c.id, { text: r.statement, ms: r.ms, affected: r.affected, error: r.error });
-        return done(resultsOut(results, 100));
+        return done(resultsOut(results, 100, c.engine));
       },
     ),
     asked('save_query', 'Save a query', 'Keeps a query under a name for this database, in the Saved list of the Query tab; the same name replaces it.', { ...inDb, name: S('Its name.', 200), text: { type: 'string', minLength: 1, maxLength: 100000 } }, ['connection', 'database', 'name', 'text'], async (a) => {
@@ -156,7 +156,7 @@ export function changeActions(api: DbCatzApi, scopes: Scopes, logQuery: (connId:
     typed('drop_database', 'Drop a database', 'Removes a database and everything in it.', { connection: CONNECTION, name: S('The database.', 512) }, ['connection', 'name'], async (a) => {
       const c = await target(a.connection);
       if (!(await api.dvDatabases(c.id)).includes(String(a.name))) throw new Error(`No database ${String(a.name)} (list_databases shows them)`);
-      return { title: `Drop the database ${String(a.name)}?`, facts: [...where(c), { label: 'Goes', value: 'every table and row in it' }], page: { connId: c.id, db: String(a.name) }, typeName: String(a.name) };
+      return { title: `Drop the database ${String(a.name)}?`, facts: [...where(c), { label: 'Goes', value: 'every table and row in it' }], page: { connId: c.id }, typeName: String(a.name) };
     }, async (a) => {
       const c = await target(a.connection);
       await api.dvDropDatabase(c.id, String(a.name), String(a.name));

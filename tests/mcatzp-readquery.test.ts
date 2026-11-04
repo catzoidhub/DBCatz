@@ -37,6 +37,9 @@ test('writes refused', () => {
   no('redis', 'SET a b');
   no('redis', 'GET a\nDEL b');
   no('redis', 'CLIENT PAUSE 1000');
+  no('redis', 'HVALS h');
+  no('redis', 'HSCAN h 0');
+  no('redis', 'DUMP a');
   no('mongodb', 'db.users.deleteMany({})');
   no('mongodb', 'db.users.aggregate([{$out:"x"}])');
   no('mongodb', 'db.users.find({$where:"1"})');
