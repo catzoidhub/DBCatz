@@ -132,6 +132,7 @@ export const MCATZP_COVERAGE = {
   mcatzpSetup: 'never: a client does not install itself',
   mcatzpInstall: 'never: a client does not install itself',
   mcatzpInstallCancel: 'never: a client does not install itself',
+  mcatzpApprovals: 'never: approval is the user\'s',
   mcatzpTargets: 'never: a client does not install itself',
   mcatzpAddToClient: 'never: a client does not install itself',
   mcatzpRemoveFromClient: 'never: a client does not install itself',

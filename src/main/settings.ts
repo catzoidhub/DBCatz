@@ -24,7 +24,8 @@ type Stored = Omit<DbCatzSettings, 'ai'> & { ai: Omit<DbCatzSettings['ai'], 'key
 
 const ids = (a: unknown) => (Array.isArray(a) ? [...new Set(a.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length < 300))] : []);
 function mcatzpOf(m: Partial<DvMcatzpSettings> | undefined): DvMcatzpSettings {
-  const clients = Array.isArray(m?.clients) ? m.clients.filter((c) => typeof c?.name === 'string' && typeof c?.approvedAt === 'string') : [];
+  // One entry per name: two sessions of a client can be approved at the same moment.
+  const clients = Array.isArray(m?.clients) ? m.clients.filter((c, i, all) => typeof c?.name === 'string' && typeof c?.approvedAt === 'string' && all.findIndex((x) => x?.name === c.name) === i) : [];
   return { on: m?.on === true, all: m?.all === true, connections: ids(m?.connections), rows: m?.rows !== false, changes: m?.changes !== false, clients };
 }
 

@@ -1,4 +1,4 @@
-import { addToClient as add, install as run, type McatzpInstallProgress, type McatzpSetup, type McatzpTarget, removeFromClient as remove, setupState as state, targets as list, type McatzpTargetId, type SetupOptions } from '@catzoid/mcatzp-host';
+import { approvalsAcrossApps, type McatzpApproval, addToClient as add, install as run, type McatzpInstallProgress, type McatzpSetup, type McatzpTarget, removeFromClient as remove, setupState as state, targets as list, type McatzpTargetId, type SetupOptions } from '@catzoid/mcatzp-host';
 import { execFile } from 'node:child_process';
 import { siteBase } from '../shared';
 
@@ -26,6 +26,7 @@ const options = async (): Promise<SetupOptions> => ({ site: siteBase(), env: awa
 
 export const setupState = async (askSite = true): Promise<McatzpSetup> => state(await options(), askSite);
 export const install = async (progress: (p: McatzpInstallProgress) => void, signal: AbortSignal): Promise<void> => run(await options(), progress, signal);
+export const approvals = async (): Promise<McatzpApproval[]> => approvalsAcrossApps(await options());
 export const targets = async (): Promise<McatzpTarget[]> => list(await options());
 export const addToClient = async (id: McatzpTargetId): Promise<void> => add(await options(), id);
 export const removeFromClient = async (id: McatzpTargetId): Promise<void> => remove(await options(), id);

@@ -54,9 +54,11 @@ export class Mcatzp {
       actions: () => this.actions(),
       isPaired: (name) => settings().mcatzp.clients.some((c) => c.name === name),
       onPaired: (name) => {
-        setMcatzpClients([...settings().mcatzp.clients, { name, approvedAt: new Date().toISOString() }]);
+        if (!settings().mcatzp.clients.some((c) => c.name === name)) setMcatzpClients([...settings().mcatzp.clients, { name, approvedAt: new Date().toISOString() }]);
+        setBridgeMcatzp(this.host.entry());
         this.win.settingsChanged();
       },
+      approved: () => settings().mcatzp.clients.map((c) => c.name),
       // A connection named in the call must be shared; one that does not exist answers with its own error in run().
       inScope: (_action, args) => {
         if (typeof args.connection !== 'string') return true;
@@ -150,6 +152,7 @@ export class Mcatzp {
   /** Forgets a client and closes every connection (a new token): the others reconnect, this one asks again. */
   revoke(name: string): Promise<void> {
     setMcatzpClients(settings().mcatzp.clients.filter((c) => c.name !== name));
+    setBridgeMcatzp(this.host.entry());
     this.win.settingsChanged();
     const next = this.queue.then(async () => {
       if (!this.host.running) return;
