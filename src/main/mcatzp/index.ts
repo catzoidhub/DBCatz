@@ -1,4 +1,4 @@
-import { type ActionDef, type ConfirmAnswer, McatzpHost } from '@catzoid/mcatzp-host';
+import { type ActionDef, type BridgeEntry, type ConfirmAnswer, McatzpHost } from '@catzoid/mcatzp-host';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { app } from 'electron';
@@ -140,7 +140,8 @@ export class Mcatzp {
   quit(): void {
     if (!this.host.running) return;
     const { channel: _c, tokenFile: _t, ...entry } = this.host.entry();
-    setBridgeMcatzp({ ...entry, enabled: false });
+    // `closed` tells the server the app is shut, not that the switch is off. The field is newer than the published protocol types.
+    setBridgeMcatzp({ ...entry, enabled: false, closed: true } as BridgeEntry);
     void this.host.stop().catch(() => undefined);
   }
 
