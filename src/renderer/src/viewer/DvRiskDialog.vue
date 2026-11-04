@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import CopyName from '../components/CopyName.vue';
 import type { DvRisk } from '@shared/types';
 
 /**
@@ -43,7 +44,7 @@ const items = computed(() => [...props.risk.items].sort((a, b) => order[a.level]
       </ul>
 
       <label v-if="needsWord && !blocked" class="block">
-        <span class="label-caps mb-1 block">Type <span class="font-mono normal-case tracking-normal opacity-100">{{ risk.confirmWord }}</span> to go ahead</span>
+        <span class="label-caps mb-1 block">Type <CopyName :value="risk.confirmWord" /> to go ahead</span>
         <input ref="input" v-model="typed" class="input input-sm w-full font-mono" :placeholder="risk.confirmWord" spellcheck="false" autocomplete="off" />
       </label>
 

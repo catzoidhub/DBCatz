@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { words } from '@shared/platform';
 import { computed, onMounted, ref } from 'vue';
+import CopyName from '../components/CopyName.vue';
 import type { DvUninstallPlan } from '@shared/types';
 import { api, notify } from '../store';
 import CatMood from './CatMood.vue';
@@ -28,10 +29,6 @@ onMounted(async () => {
 });
 const blocked = computed(() => busy.value || typed.value.trim() !== NAME);
 
-async function copyName() {
-  await navigator.clipboard.writeText(NAME);
-  notify('success', 'Name copied');
-}
 async function go() {
   if (blocked.value) return;
   busy.value = true;
@@ -78,10 +75,7 @@ async function go() {
         <p v-if="plan.dryRun" class="text-xs text-warning">Test run (a development build): only lists what would go; nothing is removed.</p>
         <div class="space-y-1.5">
           <p class="flex flex-wrap items-center gap-1 text-sm">
-            Type <b class="font-mono">{{ NAME }}</b>
-            <button class="btn btn-ghost btn-xs btn-square" title="Copy the name" aria-label="Copy the name" @click="copyName">
-              <svg viewBox="0 0 20 20" class="size-3.5" fill="currentColor"><path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h7A1.5 1.5 0 0 1 17 3.5v7a1.5 1.5 0 0 1-1.5 1.5H14V8.5A2.5 2.5 0 0 0 11.5 6H7V3.5Z" /><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h7A1.5 1.5 0 0 1 13 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 15.5v-7Z" /></svg>
-            </button>
+            Type <CopyName :value="NAME" />
             to confirm:
           </p>
           <input v-model="typed" class="input input-sm w-full font-mono" :placeholder="NAME" spellcheck="false" autocomplete="off" @keydown.enter="go" />

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import dbcatzLogo from '../assets/logos/dbcatz.png';
 import mcatzpLogo from '../assets/logos/mcatzp.svg';
 import { api, attempt, mcatzpAsk } from '../store';
+import CopyName from '../components/CopyName.vue';
 
 /** MCatzP asks here: may this MCP client connect (the first time), and may it do this change. */
 const ask = mcatzpAsk;
@@ -68,7 +69,7 @@ const answer = (a: 'deny' | 'once' | 'session') => {
           </dl>
           <template v-if="typeName">
             <label class="w-full text-left text-sm">
-              <span class="mb-1 block opacity-70">To allow it, type <code class="selectable font-semibold">{{ typeName }}</code></span>
+              <span class="mb-1 block opacity-70">To allow it, type <CopyName :value="typeName" /></span>
               <input v-model="typed" class="input input-sm w-full font-mono text-xs" spellcheck="false" autocomplete="off" @keydown.enter="typed.trim() === typeName && answer('once')" />
             </label>
             <div class="flex w-full gap-2">

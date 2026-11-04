@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import CopyName from '../components/CopyName.vue';
 
 /** A destructive action: the user types the name to confirm (like the uninstall dialogs). */
 const props = defineProps<{ title: string; text: string; name: string; confirm: string; busy?: boolean }>();
@@ -16,7 +17,7 @@ const ok = () => typed.value.trim() === props.name;
       <h3 class="text-lg font-semibold tracking-tight">{{ title }}</h3>
       <p class="text-sm opacity-70">{{ text }}</p>
       <label class="block">
-        <span class="label-caps mb-1 block">Type <span class="font-mono normal-case tracking-normal opacity-100">{{ name }}</span> to confirm</span>
+        <span class="label-caps mb-1 block">Type <CopyName :value="name" /> to confirm</span>
         <input ref="input" v-model="typed" class="input input-sm w-full font-mono" :placeholder="name" spellcheck="false" autocomplete="off" />
       </label>
       <div class="modal-action">

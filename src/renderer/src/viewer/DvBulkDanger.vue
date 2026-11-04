@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import CopyName from '../components/CopyName.vue';
 import type { DvConnection } from '@shared/types';
 import { isProd, isSql, words } from './viewer';
 
@@ -62,7 +63,7 @@ const ok = () => typed.value.trim() === word;
         </span>
       </label>
       <label class="block">
-        <span class="label-caps mb-1 block">Type <span class="font-mono normal-case tracking-normal opacity-100">{{ word }}</span> to confirm<template v-if="prod"> (Production: the connection name)</template></span>
+        <span class="label-caps mb-1 block">Type <CopyName :value="word" /> to confirm<template v-if="prod"> (Production: the connection name)</template></span>
         <input ref="input" v-model="typed" class="input input-sm w-full font-mono" :placeholder="word" spellcheck="false" autocomplete="off" />
       </label>
       <div class="modal-action">

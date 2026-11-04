@@ -13,6 +13,7 @@ import AskDbcatz from './AskDbcatz.vue';
 import CatMood from './CatMood.vue';
 import DvUpdateDialog from './DvUpdateDialog.vue';
 import DvReportDialog from './DvReportDialog.vue';
+import CopyName from '../components/CopyName.vue';
 import McatzpPairDialog from './McatzpPairDialog.vue';
 import DvWelcome from './DvWelcome.vue';
 import askMark from '../assets/logos/ask-catzoid.svg';
@@ -285,7 +286,7 @@ function menuAct(fn: (id: string) => void) {
         </div>
         <pre v-if="writeAsk.statements.length" class="max-h-48 overflow-auto rounded-lg bg-base-200/60 p-3 font-mono text-[11.5px] whitespace-pre-wrap">{{ writeAsk.statements.join('\n\n') }}</pre>
         <label v-if="writeAsk.word" class="block">
-          <span class="label-caps mb-1 block">Type <span class="font-mono normal-case tracking-normal opacity-100">{{ writeAsk.word }}</span> to go ahead</span>
+          <span class="label-caps mb-1 block">Type <CopyName :value="writeAsk.word" /> to go ahead</span>
           <input v-model="askTyped" class="input input-sm w-full font-mono" :placeholder="writeAsk.word" spellcheck="false" autocomplete="off" autofocus />
         </label>
         <div class="modal-action">
