@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { LogEntry } from '@catzoid/mcatzp-host';
-import { maskSecrets } from '../ai';
+import { maskSecrets } from '@shared/mask';
 
 const KEEP = 1000;
 

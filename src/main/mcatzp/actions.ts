@@ -1,7 +1,7 @@
 import type { ActionContext, ActionDef, CallResult } from '@catzoid/mcatzp-host';
 import type { DbCatzApi, DvConnection, DvResult } from '@shared/types';
 import { DV_KEYVALUE } from '@shared/types';
-import { maskSecrets } from '../ai';
+import { maskSecrets } from '@shared/mask';
 import { assertReadQuery } from './readquery';
 import { ALTER_OPS, alterOps } from './schema';
 

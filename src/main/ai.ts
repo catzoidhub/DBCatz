@@ -1,3 +1,4 @@
+import { maskSecrets } from '@shared/mask';
 import Anthropic from '@anthropic-ai/sdk';
 import { aiProvider, DV_ASK_ARGS, DV_ASK_KINDS, DV_ASK_WRITES, DV_DOCUMENT, DV_KEYVALUE, DV_SQL, type DvAskAction, type DvAskAnswer, type DvAskRequest, type DvEngine, type DvLogAnswer, type DvLogRequest, type DvAiAnswer, type DvAiProgress, type DvAiPreview, type DvAiProvider, type DvAiRequest, type DvAiTurn, type DvStructure, type DvTable } from '@shared/types';
 import type { DbViewerManager } from './dbviewer/manager';
@@ -140,16 +141,6 @@ const LOG_SCHEMA = {
   required: ['summary', 'cause', 'steps', 'query'],
   additionalProperties: false,
 };
-/** Obvious secrets in logged statements: passwords and tokens in quotes, IDENTIFIED BY, AUTH, URLs with a password. */
-export function maskSecrets(text: string): string {
-  return text
-    // IDENTIFIED BY 'x', PASSWORD 'x', AUTH x (Redis): the value right after the word.
-    .replace(/\b(IDENTIFIED\s+(?:WITH\s+\S+\s+)?BY|PASSWORD|AUTH)(\s+)('[^']*'|"[^"]*"|(?![=:])\S+)/gi, '$1$2•••')
-    .replace(/\b(\w*(?:pass(?:word)?|secret|token|api_?key)\w*)(["']?\s*[:=]\s*)('[^']*'|"[^"]*"|[^\s,)]+)/gi, '$1$2•••')
-    .replace(/(\w+:\/\/[^:/\s@]+:)[^@\s/]+@/g, '$1•••@')
-    .replace(/\b(sk|pk|rk|ghp|github_pat|xox[abprs]|AKIA)[-_A-Za-z0-9]{10,}/g, '•••');
-}
-
 /** Which model a request goes to (default: the one chosen in Settings), and a way to stop it. */
 interface Use {
   provider?: DvAiProvider;

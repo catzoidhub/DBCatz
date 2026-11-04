@@ -4,7 +4,7 @@ import type { DvReport, DvReportKind, DvReportSettings, ReportShot } from '@shar
 import { store } from './store';
 import { siteBase } from './shared';
 import { platformId } from './companion';
-import { maskSecrets } from './ai';
+import { maskSecrets } from '@shared/mask';
 import { installId, updateChannel } from './updater';
 
 /**
