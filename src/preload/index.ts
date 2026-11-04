@@ -42,6 +42,8 @@ const bridge = {
   onMcatzpLog: (cb: (e: { connId: string; text: string; ms: number; affected: number | null; error: string | null }) => void) => on('viewer:mcatzpLog', cb),
   /** The main process asks for what only the window holds; answered with mcatzpWindowReply. */
   onMcatzpRead: (cb: (req: { id: string; what: 'log' | 'history'; connId: string; db: string }) => void) => on('viewer:mcatzpRead', cb),
+  /** A new MCatzP is available (its version), or no longer is (null). */
+  onMcatzpUpdate: (cb: (version: string | null) => void) => on('viewer:mcatzpUpdate', cb),
   /** Install MCatzP running in Settings. */
   onMcatzpInstalling: (cb: (p: McatzpInstallProgress | null) => void) => on('viewer:mcatzpInstalling', cb),
   /** The first error while Send crash reports was never answered: ask once. */

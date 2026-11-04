@@ -41,6 +41,15 @@ const ai = new AskAi(viewer);
 const updater = new Updater();
 const reporter = new Reporter();
 let mcatzp: Mcatzp;
+let mcatzpUpdate: string | null = null;
+/** Settings' MCatzP badge: asked once a day while the switch is on, and whenever the page or an install has news. */
+const MCATZP_UPDATE_EVERY_MS = 24 * 3600_000;
+async function checkMcatzpUpdate(): Promise<void> {
+  const next = settings().mcatzp.on ? await mcatzpSetup.availableUpdate().catch(() => mcatzpUpdate) : null;
+  if (next === mcatzpUpdate) return;
+  mcatzpUpdate = next;
+  viewerWindow()?.webContents.send('viewer:mcatzpUpdate', next);
+}
 const windowReads = new Map<string, (data: unknown) => void>();
 /** What only the window holds (Logs, History). No window, or none answering: there is nothing to read. */
 function askWindow<T>(what: 'log' | 'history', connId: string, db: string): Promise<T[]> {
@@ -172,7 +181,10 @@ function api(): DbCatzApi {
     setSettings: async (patch) => {
       const next = setSettings(patch);
       if (patch.mcatzp) {
-        if (patch.mcatzp.on !== undefined) await mcatzp.set(next.mcatzp.on);
+        if (patch.mcatzp.on !== undefined) {
+          await mcatzp.set(next.mcatzp.on);
+          void checkMcatzpUpdate();
+        }
         mcatzp.scopesChanged();
       }
       return next;
@@ -192,7 +204,10 @@ function api(): DbCatzApi {
     mcatzpActivity: async () => mcatzp.activity.list(),
     mcatzpClearActivity: async () => mcatzp.activity.clear(),
     mcatzpRevoke: (name) => mcatzp.revoke(String(name)),
-    mcatzpSetup: (askSite) => mcatzpSetup.setupState(askSite !== false),
+    mcatzpSetup: async (askSite) => {
+      if (askSite !== false) void checkMcatzpUpdate();
+      return mcatzpSetup.setupState(askSite !== false);
+    },
     mcatzpInstall: async () => {
       if (mcatzpInstalling) throw new Error('MCatzP is being installed');
       mcatzpInstalling = new AbortController();
@@ -207,6 +222,7 @@ function api(): DbCatzApi {
         mcatzpInstalling = null;
         report(null);
       }
+      void checkMcatzpUpdate();
       return mcatzpSetup.setupState();
     },
     mcatzpInstallCancel: async () => mcatzpInstalling?.abort(),
@@ -220,6 +236,7 @@ function api(): DbCatzApi {
       await mcatzpSetup.removeFromClient(clientId(id));
       return mcatzpSetup.targets();
     },
+    mcatzpUpdate: async () => mcatzpUpdate,
     mcatzpPending: async () => mcatzp.pending(),
     mcatzpWindowReply: async (id, data) => {
       windowReads.get(String(id))?.(data);
@@ -309,6 +326,8 @@ app.whenReady().then(() => {
     queryHistory: (connId, db) => askWindow('history', connId, db),
   });
   void mcatzp.set(settings().mcatzp.on).catch(() => undefined);
+  setTimeout(() => void checkMcatzpUpdate(), 30_000);
+  setInterval(() => void checkMcatzpUpdate(), MCATZP_UPDATE_EVERY_MS);
   viewer.onJobs = (jobs) => send('viewer:jobs', jobs);
   viewer.onProgress = (p) => send('viewer:progress', p);
   viewer.onChange = () => {

@@ -56,6 +56,8 @@ export const settingsTab = ref<'appearance' | 'ai' | 'mcatzp' | 'updates' | 'abo
 /** A question from an MCP client waiting for the user (McatzpPairDialog), and Install MCatzP running in Settings. */
 export const mcatzpAsk = ref<McatzpAsk | null>(null);
 export const mcatzpInstalling = ref<McatzpInstallProgress | null>(null);
+/** The MCatzP version to update to; null when up to date. */
+export const mcatzpUpdate = ref<string | null>(null);
 
 /** In-app updates (Catzoid #54): the main process's state, and whether the update dialog is open. */
 export const update = ref<DvUpdateState | null>(null);

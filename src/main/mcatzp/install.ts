@@ -26,6 +26,11 @@ const options = async (): Promise<SetupOptions> => ({ site: siteBase(), env: awa
 
 export const setupState = async (askSite = true): Promise<McatzpSetup> => state(await options(), askSite);
 export const install = async (progress: (p: McatzpInstallProgress) => void, signal: AbortSignal): Promise<void> => run(await options(), progress, signal);
+/** The version to update to: only a copy these apps installed, a Homebrew or npm copy updates its own way. Null when up to date. */
+export async function availableUpdate(): Promise<string | null> {
+  const { source, version, latest } = await setupState();
+  return source === 'catzoid' && version && latest && version.localeCompare(latest, undefined, { numeric: true }) < 0 ? latest : null;
+}
 export const approvals = async (): Promise<McatzpApproval[]> => approvalsAcrossApps(await options());
 export const targets = async (): Promise<McatzpTarget[]> => list(await options());
 export const addToClient = async (id: McatzpTargetId): Promise<void> => add(await options(), id);
