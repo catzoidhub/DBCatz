@@ -169,7 +169,7 @@ const groups = computed(() => {
         <input type="checkbox" class="toggle toggle-primary toggle-sm mt-0.5" :checked="on" @change="save({ on: ($event.target as HTMLInputElement).checked })" />
         <span>
           Let AI assistants use DBCatz through MCatzP
-          <span class="block text-xs opacity-60">An MCP client you approve can read the connections you share (secret-looking columns masked). It reaches DBCatz through a channel only your account on {{ words.thisComputer }} can open. What it reads goes to that assistant's model provider.</span>
+          <span class="block text-xs opacity-60">An MCP client you approve can read the connections you share (secret-looking columns masked) and ask for changes, which DBCatz confirms with you first. It reaches DBCatz through a channel only your account on {{ words.thisComputer }} can open. What it reads goes to that assistant's model provider.</span>
         </span>
       </label>
       <!-- Clients start this program, so it is what a client's setup points at. -->
@@ -270,6 +270,10 @@ const groups = computed(() => {
           <label class="flex cursor-pointer items-start gap-2 text-sm">
             <input type="checkbox" class="checkbox checkbox-sm mt-0.5" :checked="s.rows" @change="save({ rows: ($event.target as HTMLInputElement).checked })" />
             <span>Rows, query results and keys<span class="block text-xs opacity-60">Clients can read data and run queries that only read; values under secret-looking columns stay masked. They can hold personal data, which then goes to the assistant's model provider. Off: only the structure (databases, tables, columns, indexes).</span></span>
+          </label>
+          <label class="flex cursor-pointer items-start gap-2 text-sm">
+            <input type="checkbox" class="checkbox checkbox-sm mt-0.5" :checked="s.changes" @change="save({ changes: ($event.target as HTMLInputElement).checked })" />
+            <span>Let clients ask for changes<span class="block text-xs opacity-60">Writing rows and queries, creating and changing tables, keys, imports and more. DBCatz shows you each request first, and asks you to type a name for what cannot be undone; Read-only connections refuse them all. Off: clients can only read.</span></span>
           </label>
         </div>
         </div>

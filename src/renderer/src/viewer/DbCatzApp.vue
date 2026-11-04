@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection } from '@shared/types';
 import { aiOn, api, init, mcatzpAsk, mcatzpInstalling, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
 import { DB_LOGO } from '../db';
-import { writeAsk, isKv, isProd, isReadOnly, linkWhere, progress, active, closeOtherTabs, closeTab, connections, cycleTab, dispatch, duplicateTab, editing, jobs, openTab, refreshConnections, showJobs, tabs } from './viewer';
+import { activity, history, historyKey, logActivity, writeAsk, isKv, isProd, isReadOnly, linkWhere, progress, active, closeOtherTabs, closeTab, connections, cycleTab, dispatch, duplicateTab, editing, jobs, openTab, refreshConnections, showJobs, tabs } from './viewer';
 import DvHome from './DvHome.vue';
 import DvWorkspace from './DvWorkspace.vue';
 import DvJobs from './DvJobs.vue';
@@ -48,6 +48,12 @@ onMounted(async () => {
   });
   api.onMcatzpAsk((ask) => {
     mcatzpAsk.value = ask;
+  });
+  api.onMcatzpLog(({ connId, ...e }) => logActivity(connId, e));
+  api.onMcatzpRead(({ id, what, connId, db }) => {
+    // Plain copies: reactive arrays cannot cross the context bridge.
+    const data = what === 'log' ? (activity.get(connId) ?? []).map((a) => ({ ...a })) : [...(history.get(historyKey(connId, db)) ?? [])];
+    void api.mcatzpWindowReply(id, data);
   });
   api.onMcatzpInstalling((p) => {
     mcatzpInstalling.value = p;

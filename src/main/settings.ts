@@ -25,7 +25,7 @@ type Stored = Omit<DbCatzSettings, 'ai'> & { ai: Omit<DbCatzSettings['ai'], 'key
 const ids = (a: unknown) => (Array.isArray(a) ? [...new Set(a.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length < 300))] : []);
 function mcatzpOf(m: Partial<DvMcatzpSettings> | undefined): DvMcatzpSettings {
   const clients = Array.isArray(m?.clients) ? m.clients.filter((c) => typeof c?.name === 'string' && typeof c?.approvedAt === 'string') : [];
-  return { on: m?.on === true, all: m?.all === true, connections: ids(m?.connections), rows: m?.rows !== false, clients };
+  return { on: m?.on === true, all: m?.all === true, connections: ids(m?.connections), rows: m?.rows !== false, changes: m?.changes !== false, clients };
 }
 
 /** DBCatz's own copy (config.json): the fallback, and the on / off switch. */
@@ -97,6 +97,7 @@ export function setSettings(patch: DbCatzSettingsPatch): DbCatzSettings {
     if (m.on !== undefined) s.mcatzp.on = m.on === true;
     if (m.all !== undefined) s.mcatzp.all = m.all === true;
     if (m.rows !== undefined) s.mcatzp.rows = m.rows === true;
+    if (m.changes !== undefined) s.mcatzp.changes = m.changes === true;
     if (m.connections !== undefined) s.mcatzp.connections = ids(m.connections);
   }
   store.setExtra(KEY, s);
@@ -111,6 +112,13 @@ export function setSettings(patch: DbCatzSettingsPatch): DbCatzSettings {
 export function setMcatzpClients(clients: DvMcatzpSettings['clients']): void {
   const s = stored();
   s.mcatzp.clients = clients;
+  store.setExtra(KEY, s);
+}
+
+/** A connection a client just added, with the user's Allow, is shared with it from then on. */
+export function saveMcatzpShared(id: string): void {
+  const s = stored();
+  s.mcatzp.connections = [...new Set([...s.mcatzp.connections, id])];
   store.setExtra(KEY, s);
 }
 

@@ -6,7 +6,7 @@ import { api, attempt, mcatzpAsk } from '../store';
 
 /** MCatzP asks here: may this MCP client connect (the first time), and may it do this change. */
 const ask = mcatzpAsk;
-const CAN = ['The connections you share: databases, tables, structure', 'Their rows, query results and keys, when you share them, with secret-looking columns masked', 'Queries that only read, nothing that changes data'];
+const CAN = ['The connections you share: databases, tables, structure', 'Their rows, query results and keys, when you share them, with secret-looking columns masked'];
 const typed = ref('');
 const typeName = computed(() => (ask.value?.kind === 'change' ? ask.value.typeName : undefined));
 watch(() => ask.value?.id, () => (typed.value = ''));
@@ -47,7 +47,7 @@ const answer = (a: 'deny' | 'once' | 'session') => {
             <ul class="space-y-1 text-sm">
               <li v-for="c in CAN" :key="c" class="flex items-center gap-2"><span class="status status-success status-xs shrink-0" />{{ c }}</li>
             </ul>
-            <p class="mt-2 border-t border-base-300/60 pt-2 text-xs opacity-70">Production connections stay out unless you tick them one by one. What it reads goes to that assistant's model provider.</p>
+            <p class="mt-2 border-t border-base-300/60 pt-2 text-xs opacity-70">It can also ask for changes; DBCatz asks you first, and you type a name for what cannot be undone. Production connections stay out unless you tick them one by one. What it reads goes to that assistant's model provider.</p>
           </div>
           <p class="text-xs opacity-60">You can revoke this in Settings → MCatzP. The name is what the client says about itself: if you did not just start it, choose Don't Allow.</p>
           <div class="flex w-full gap-2">

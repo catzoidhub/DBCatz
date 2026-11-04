@@ -4,9 +4,8 @@ import type { DbCatzApi } from '@shared/types';
  * Every action DBCatz can do, and where it stands with MCatzP (scope: every action, user 2026-10-28). A new method in
  * DbCatzApi fails the typecheck here until it is placed, so nothing is left out unnoticed.
  * `tool: …` is done. `later: …` is still to do, in that tier. `not a tool`: it only makes sense in the window (a menu, a
- * file picker, this app's own updater or AI buttons). `never: …`: left out on purpose, with why. `ask the user`: a
- * decision that is the user's to make first.
- * A tab fed from the window's own state has no method here and needs its own look: Logs and Query history (TODO §16).
+ * file picker, this app's own updater or AI buttons). `never: …`: left out on purpose, with why.
+ * A tab fed from the window's own state has no method here, so it has its own tool: Logs (list_query_log), History (list_query_history).
  */
 export const MCATZP_COVERAGE = {
   // tool: list_connections
@@ -38,46 +37,46 @@ export const MCATZP_COVERAGE = {
   // tool: get_key
   dvKey: 'tool: get_key',
 
-  // later: change
-  dvUpdateRow: 'later: change',
-  dvInsertRow: 'later: change',
-  dvCreateDatabase: 'later: change',
-  dvCreateTable: 'later: change',
-  dvAlterCheck: 'later: change',
-  dvAlterTable: 'later: change',
-  dvDuplicateTable: 'later: change',
-  dvExport: 'later: change',
-  dvImport: 'later: change',
-  dvBackup: 'later: change',
-  dvCancelJob: 'later: change',
-  dvClearJobs: 'later: change',
-  dvKeySet: 'later: change',
-  dvKeyRename: 'later: change',
-  dvSaveQuery: 'later: change',
-  dvDeleteQuery: 'later: change',
-  dvSetLayout: 'later: change',
-  dvSetDbPrefs: 'later: change',
-  dvDisconnect: 'later: change',
-  dvOpen: 'later: change',
-  openInDevCatz: 'later: change',
-  openInDoCatz: 'later: change',
+  // change
+  dvInsertRow: 'tool: insert_row',
+  dvUpdateRow: 'tool: update_row',
+  dvCreateDatabase: 'tool: create_database',
+  dvCreateTable: 'tool: create_table',
+  dvAlterCheck: 'tool: check_alter',
+  dvAlterTable: 'tool: alter_table',
+  dvDuplicateTable: 'tool: duplicate_table',
+  dvExport: 'tool: export_data',
+  dvImport: 'tool: import_file',
+  dvBackup: 'tool: backup',
+  dvCancelJob: 'tool: cancel_job',
+  dvClearJobs: 'tool: clear_finished_jobs',
+  dvKeySet: 'tool: set_key',
+  dvKeyRename: 'tool: rename_key',
+  dvSaveQuery: 'tool: save_query',
+  dvDeleteQuery: 'tool: delete_saved_query',
+  dvSetLayout: 'tool: set_favorite, set_group',
+  dvSetDbPrefs: 'tool: star_database',
+  dvDisconnect: 'tool: disconnect',
+  dvOpen: 'tool: open_in_window',
+  openInDevCatz: 'tool: open_in_service_app',
+  openInDoCatz: 'tool: open_in_service_app',
+  dvSaveConnection: 'tool: add_connection (new, plain, no password; editing could lift Read-only, so it stays in the window)',
+  dvTestConnection: 'tool: server_info (connects to a shared connection; a test of unsaved settings would need their secrets)',
 
-  // later: destructive
-  dvDeleteRows: 'later: destructive',
-  dvDropDatabase: 'later: destructive',
-  dvDropTable: 'later: destructive',
-  dvDropTables: 'later: destructive',
-  dvTruncateTable: 'later: destructive',
-  dvTruncateTables: 'later: destructive',
-  dvKeyDelete: 'later: destructive',
-  dvFlush: 'later: destructive',
+  // destructive: type a name
+  dvDeleteRows: 'tool: delete_rows',
+  dvDropDatabase: 'tool: drop_database',
+  dvDropTable: 'tool: drop_tables',
+  dvDropTables: 'tool: drop_tables',
+  dvTruncateTable: 'tool: truncate_tables',
+  dvTruncateTables: 'tool: truncate_tables',
+  dvKeyDelete: 'tool: delete_keys',
+  dvFlush: 'tool: flush_keys',
+  dvDeleteConnection: 'tool: delete_connection (its stored password cannot be had back)',
 
-  // ask the user: a client never sets or sees a secret, and deleting one loses the password it holds
-  dvSaveConnection: 'ask the user',
-  dvDeleteConnection: 'ask the user',
-  dvTestConnection: 'ask the user',
-  dvAwsProfiles: 'ask the user',
-  dvSshKeys: 'ask the user',
+  // never: SSH, AWS and Vault hold secrets, and are set up in the window
+  dvAwsProfiles: 'never: only for setting up a connection in the window',
+  dvSshKeys: 'never: only for setting up a connection in the window',
 
   // not a tool: only makes sense in the window
   appInfo: 'not a tool',
@@ -128,6 +127,7 @@ export const MCATZP_COVERAGE = {
   mcatzpClearActivity: 'never: the log watches the client',
   mcatzpRevoke: 'never: approval is the user\'s',
   mcatzpPending: 'never: the question is for the user',
+  mcatzpWindowReply: 'never: the window answering the main process',
   mcatzpAnswer: 'never: the question is for the user',
   mcatzpSetup: 'never: a client does not install itself',
   mcatzpInstall: 'never: a client does not install itself',

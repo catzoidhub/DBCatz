@@ -57,6 +57,8 @@ export interface DvMcatzpSettings {
   connections: string[];
   /** Rows, query results and key values go out too. Off: only the structure. */
   rows: boolean;
+  /** Clients may ask for changes, each confirmed in a dialog. Off: they only read. */
+  changes: boolean;
   /** Approved clients, until Revoke. Set by the main process only. */
   clients: { name: string; approvedAt: string }[];
 }
@@ -839,6 +841,8 @@ export interface DbCatzApi {
   mcatzpRemoveFromClient(id: McatzpTarget['id']): Promise<McatzpTarget[]>;
   /** The question waiting for the user, for a window that just opened; later ones come as viewer:mcatzpAsk events. */
   mcatzpPending(): Promise<McatzpAsk | null>;
+  /** The window's answer to a viewer:mcatzpRead request (its Logs and History live there). */
+  mcatzpWindowReply(id: string, data: unknown): Promise<void>;
   /** The answer to the question shown. */
   mcatzpAnswer(id: string, answer: 'deny' | 'once' | 'session', typed?: string): Promise<void>;
   openUrl(url: string): Promise<void>;
@@ -945,6 +949,6 @@ export interface DbCatzApi {
 
 /** Every method of the bridge, registered as `dbcatz:<name>` IPC handlers. */
 export const API_METHODS: (keyof DbCatzApi)[] = [
-  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'mcatzpActivity', 'mcatzpClearActivity', 'mcatzpRevoke', 'mcatzpSetup', 'mcatzpInstall', 'mcatzpInstallCancel', 'mcatzpTargets', 'mcatzpAddToClient', 'mcatzpRemoveFromClient', 'mcatzpPending', 'mcatzpAnswer', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
+  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'mcatzpActivity', 'mcatzpClearActivity', 'mcatzpRevoke', 'mcatzpSetup', 'mcatzpInstall', 'mcatzpInstallCancel', 'mcatzpTargets', 'mcatzpAddToClient', 'mcatzpRemoveFromClient', 'mcatzpPending', 'mcatzpAnswer', 'mcatzpWindowReply', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
   'dvConnections', 'dvSaveConnection', 'dvDeleteConnection', 'dvTestConnection', 'dvServerInfo', 'dvCancelConnect', 'dvDisconnect', 'dvLayout', 'dvSetLayout', 'dvAwsProfiles', 'dvSshKeys', 'dvDatabases', 'dvTables', 'dvStructure', 'dvRows', 'dvUpdateRow', 'dvInsertRow', 'dvDeleteRows', 'dvQuery', 'dvCreateDatabase', 'dvCharsets', 'dvDropDatabase', 'dvCreateTable', 'dvAlterCheck', 'dvAlterTable', 'dvDropTable', 'dvTruncateTable', 'dvDuplicateTable', 'dvDropTables', 'dvTruncateTables', 'dvTypes', 'dvExport', 'dvImport', 'dvBackup', 'dvJobs', 'dvClearJobs', 'dvCancelJob', 'dvReveal', 'dvTableMenu', 'dvAppMenu', 'dvMenuShortcuts', 'dvMenuKey', 'dvPickSqlite', 'dvOpen', 'dvKeys', 'dvKey', 'dvKeySet', 'dvKeyDelete', 'dvKeyRename', 'dvFlush', 'dvSavedQueries', 'dvSaveQuery', 'dvDeleteQuery', 'dvGridPrefs', 'dvSetGridPrefs', 'dvDbPrefs', 'dvSetDbPrefs',
 ];

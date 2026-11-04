@@ -3,6 +3,7 @@ import type { DbCatzApi, DvConnection, DvResult } from '@shared/types';
 import { DV_KEYVALUE } from '@shared/types';
 import { maskSecrets } from '../ai';
 import { assertReadQuery } from './readquery';
+import { ALTER_OPS, alterOps } from './schema';
 
 /**
  * DBCatz's actions for MCatzP (TODO §16): each one calls the same `api()` method its UI uses. This is the read tier.
@@ -16,7 +17,7 @@ const CONNECTION = NAME("The connection's id or name (see list_connections).");
 const DATABASE = NAME('The database (see list_databases). Redis / Valkey: db0, db1 …');
 const TABLE = NAME('The table or view. MongoDB: a collection. Elasticsearch: an index.');
 
-const reply = (data: unknown): CallResult => ({ text: JSON.stringify(data, null, 2), data });
+export const reply = (data: unknown): CallResult => ({ text: JSON.stringify(data, null, 2), data });
 
 const SECRET_NAME = /passw(or)?d|passphrase|\bpwd\b|secret|token|api_?key|private_?key|credential|\bsalt\b|\botp\b/i;
 const MAX_CELL = 2000;
@@ -57,6 +58,8 @@ export interface Scopes {
   connection(c: DvConnection): boolean;
   /** Rows, query results and key values; off = only the structure. */
   rows: boolean;
+  /** Clients may ask for changes; off = they only read. */
+  changes: boolean;
 }
 
 /** The part of the viewer the read tier needs beyond the API. */
@@ -64,9 +67,24 @@ export interface ReadQuery {
   readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal): Promise<DvResult[]>;
 }
 
+/** Query results for the client: cut at `max` rows, secret-looking columns masked. */
+export function resultsOut(results: DvResult[], max: number): unknown {
+  return results.map((r) => ({
+    statement: r.statement,
+    ...(r.error ? { error: maskSecrets(r.error) } : { columns: r.columns, rowCount: r.rows.length, ...(r.affected !== null ? { affected: r.affected } : {}), ...(r.rows.length > max ? { cutAt: max } : {}), ...rowsOut(r.columns, r.rows.slice(0, max)) }),
+    ms: r.ms,
+  }));
+}
+
+/** Tabs that live in the window's own state, read through it. */
+export interface WindowReads {
+  queryLog(connId: string): Promise<{ time: number; text: string; ms: number | null; affected: number | null; error: string | null }[]>;
+  queryHistory(connId: string, db: string): Promise<string[]>;
+}
+
 const NOTHING_SHARED = 'No connections are shared with MCatzP yet: the user chooses them in DBCatz, Settings → MCatzP.';
 
-export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes): ActionDef[] {
+export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes, windowReads: WindowReads, logQuery: (connId: string, r: { text: string; ms: number; affected: number | null; error: string | null }) => void): ActionDef[] {
   const conn = async (ref: unknown) => findConnection(await api.dvConnections(), String(ref));
   const read = (name: string, title: string, description: string, input: ReturnType<typeof OBJECT>, run: (args: Record<string, unknown>, ctx: ActionContext) => Promise<CallResult>): ActionDef => ({ name, title, description, tier: 'read', input, run });
   const keys = async (ref: unknown) => {
@@ -121,6 +139,10 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes): 
       const c = await conn(connection);
       return reply((await api.dvSavedQueries(c.id, String(database))).map((q) => ({ name: q.name, text: maskSecrets(q.text), updated: new Date(q.updated).toISOString() })));
     }),
+    read('check_alter', 'Check a table change', 'What alter_table would risk, without changing anything: data that would not fit, a dropped column, what points at it. `level` is none, warn, danger (the user types a name) or block (refused).', OBJECT({ connection: CONNECTION, database: DATABASE, table: TABLE, ops: ALTER_OPS }, ['connection', 'database', 'table', 'ops']), async ({ connection, database, table, ops }) => {
+      const c = await conn(connection);
+      return reply(await api.dvAlterCheck(c.id, String(database), String(table), alterOps(ops)));
+    }),
     read('list_jobs', 'List jobs', 'Exports, imports and backups on the shared connections: how far each is, and how it ended. Check here after starting one, and tell the user.', OBJECT(), async () => {
       const [jobs, all] = await Promise.all([api.dvJobs(), api.dvConnections()]);
       const shared = new Set(all.filter((c) => scopes.connection(c)).map((c) => c.id));
@@ -129,6 +151,14 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes): 
   ];
 
   const data = [
+    read('list_query_log', 'Read the query log', "What ran on this connection since DBCatz opened, the newest first: the Logs tab. Statements, how long they took, rows changed and errors, with secrets masked.", OBJECT({ connection: CONNECTION, limit: { type: 'integer', minimum: 1, maximum: 500, description: '100 when left out.' } }, ['connection']), async ({ connection, limit }) => {
+      const c = await conn(connection);
+      return reply((await windowReads.queryLog(c.id)).slice(0, Number(limit ?? 100)).map((e) => ({ time: new Date(e.time).toISOString(), text: maskSecrets(e.text), ms: e.ms, affected: e.affected, error: e.error ? maskSecrets(e.error) : null })));
+    }),
+    read('list_query_history', 'Read the query history', 'Queries the user ran on this database since DBCatz opened, the newest first: the History list of the Query tab. Secrets masked.', OBJECT({ connection: CONNECTION, database: DATABASE }, ['connection', 'database']), async ({ connection, database }) => {
+      const c = await conn(connection);
+      return reply((await windowReads.queryHistory(c.id, String(database))).map(maskSecrets));
+    }),
     read(
       'read_rows',
       'Read rows',
@@ -151,13 +181,8 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes): 
         assertReadQuery(c.engine, String(query));
         const max = Number(maxRows ?? 100);
         const results = await viewer.readQuery(c.id, String(database), String(query), Number(timeout ?? 30) * 1000, ctx.signal);
-        return reply(
-          results.map((r) => ({
-            statement: r.statement,
-            ...(r.error ? { error: maskSecrets(r.error) } : { columns: r.columns, rowCount: r.rows.length, ...(r.rows.length > max ? { cutAt: max } : {}), ...rowsOut(r.columns, r.rows.slice(0, max)) }),
-            ms: r.ms,
-          })),
-        );
+        for (const r of results) logQuery(c.id, { text: r.statement, ms: r.ms, affected: r.affected, error: r.error });
+        return reply(resultsOut(results, max));
       },
     ),
     read(

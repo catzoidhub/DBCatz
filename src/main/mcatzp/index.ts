@@ -4,17 +4,30 @@ import { join } from 'node:path';
 import { app } from 'electron';
 import type { DbCatzApi, DvConnection, McatzpAsk } from '@shared/types';
 import { setBridgeMcatzp } from '../bridge';
-import { setMcatzpClients, settings } from '../settings';
-import { findConnection, type ReadQuery, readActions, type Scopes } from './actions';
+import { saveMcatzpShared, setMcatzpClients, settings } from '../settings';
+import { findConnection, type ReadQuery, readActions, type Scopes, type WindowReads } from './actions';
 import { ActivityLog } from './activity';
+import { type ChangeAction, changeActions, type McatzpPage } from './changes';
 
-/** Unanswered questions lapse before MCatzP stops waiting (3 minutes), so a late Allow never runs for nobody. */
+/** Unanswered questions lapse before MCatzP stops waiting (3 and 10 minutes), so a late Allow never runs for nobody. */
 const PAIR_WAIT_MS = 150_000;
+const CHANGE_WAIT_MS = 9 * 60_000;
 
 /** What the controller needs from the viewer: its connections right now, without a round through the API. */
 interface Viewer extends ReadQuery {
   connections(): DvConnection[];
   closeReaders(): void;
+}
+
+/** What it needs from the window. */
+export interface McatzpWindow extends WindowReads {
+  show(ask: McatzpAsk | null): void;
+  settingsChanged(): void;
+  /** After Allow: the page of what was asked. */
+  open(page: McatzpPage): void;
+  /** A change ran: the window reloads what it shows. */
+  refresh(): void;
+  logQuery(connId: string, r: { text: string; ms: number; affected: number | null; error: string | null }): void;
 }
 
 /**
@@ -33,8 +46,7 @@ export class Mcatzp {
   constructor(
     private readonly api: DbCatzApi,
     private readonly viewer: Viewer,
-    private readonly show: (ask: McatzpAsk | null) => void,
-    private readonly settingsChanged: () => void,
+    private readonly win: McatzpWindow,
   ) {
     this.host = new McatzpHost({
       app: { id: 'dbcatz', name: 'DBCatz', version: app.getVersion() },
@@ -43,7 +55,7 @@ export class Mcatzp {
       isPaired: (name) => settings().mcatzp.clients.some((c) => c.name === name),
       onPaired: (name) => {
         setMcatzpClients([...settings().mcatzp.clients, { name, approvedAt: new Date().toISOString() }]);
-        this.settingsChanged();
+        this.win.settingsChanged();
       },
       // A connection named in the call must be shared; one that does not exist answers with its own error in run().
       inScope: (_action, args) => {
@@ -55,15 +67,42 @@ export class Mcatzp {
         }
       },
       pair: (client) => this.ask({ id: randomUUID(), kind: 'pair', client: client.name, version: client.version ?? null }, PAIR_WAIT_MS).then((a) => a !== 'deny'),
-      // The read tier has no question to ask; the change tier brings its dialogs (TODO §16).
-      confirm: async () => 'deny',
+      confirm: async (req) => {
+        const change = this.changes().find((c) => c.name === req.action.name);
+        if (!change) return 'deny';
+        if (change.noDialog) return 'once';
+        // If this throws, the action never runs: its error goes to the client instead of a question.
+        const { page, ...question } = await change.preview(req.args);
+        const answer = await this.ask({ id: randomUUID(), kind: 'change', client: req.client, allowSession: req.allowSession && !question.typeName, ...question }, CHANGE_WAIT_MS, req.signal);
+        // The user is right here and just said yes: take them to what is happening. Not for allowed-for-the-session calls.
+        if (answer !== 'deny' && !req.signal.aborted && page) this.win.open(page);
+        return answer;
+      },
       log: (e) => this.activity.add(e),
     });
     setBridgeMcatzp(this.host.entry());
   }
 
   private actions(): ActionDef[] {
-    return readActions(this.api, this.viewer, this.scopes());
+    const reads = readActions(this.api, this.viewer, this.scopes(), this.win, (id, r) => this.win.logQuery(id, r));
+    // The window follows what a client changed, as if it was done there.
+    const changes = this.changes().map((c) => ({
+      ...c,
+      run: async (args: Record<string, unknown>, ctx: Parameters<ChangeAction['run']>[1]) => {
+        const out = await c.run(args, ctx);
+        this.win.refresh();
+        return out;
+      },
+    }));
+    return [...reads, ...changes];
+  }
+
+  private changes(): ChangeAction[] {
+    return changeActions(this.api, this.scopes(), (id, r) => this.win.logQuery(id, r), (id) => {
+      saveMcatzpShared(id);
+      this.host.notifyChanged();
+      this.win.settingsChanged();
+    });
   }
 
   private scopes(): Scopes {
@@ -73,6 +112,7 @@ export class Mcatzp {
       // A connection opened from a URL is for this session and this window. Production never goes along with "all".
       connection: (c) => !c.temporary && (shared.has(c.id) || (s.all && c.options.mode !== 'production')),
       rows: s.rows,
+      changes: s.changes,
     };
   }
 
@@ -85,7 +125,7 @@ export class Mcatzp {
           clearTimeout(a.timer);
           a.done('deny');
         }
-        this.show(null);
+        this.win.show(null);
         this.viewer.closeReaders();
       }
       setBridgeMcatzp(await (on ? this.host.start() : this.host.stop()));
@@ -110,7 +150,7 @@ export class Mcatzp {
   /** Forgets a client and closes every connection (a new token): the others reconnect, this one asks again. */
   revoke(name: string): Promise<void> {
     setMcatzpClients(settings().mcatzp.clients.filter((c) => c.name !== name));
-    this.settingsChanged();
+    this.win.settingsChanged();
     const next = this.queue.then(async () => {
       if (!this.host.running) return;
       await this.host.stop();
@@ -126,7 +166,7 @@ export class Mcatzp {
       this.asks.push({ ask, done, timer });
       // The client gave up or left: nobody is waiting for this any more, so the question must not stay to be allowed later.
       gone?.addEventListener('abort', () => this.answer(ask.id, 'deny'), { once: true });
-      if (this.asks.length === 1) this.show(ask);
+      if (this.asks.length === 1) this.win.show(ask);
     });
   }
 
@@ -145,6 +185,6 @@ export class Mcatzp {
     const [a] = this.asks.splice(at, 1);
     clearTimeout(a.timer);
     a.done(answer);
-    this.show(this.asks[0]?.ask ?? null);
+    this.win.show(this.asks[0]?.ask ?? null);
   }
 }

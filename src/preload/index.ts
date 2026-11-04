@@ -38,6 +38,10 @@ const bridge = {
   onUpdateOpen: (cb: () => void) => on('viewer:updateOpen', cb),
   /** A question from an MCP client waiting for the user (null: none left). */
   onMcatzpAsk: (cb: (ask: McatzpAsk | null) => void) => on('viewer:mcatzpAsk', cb),
+  /** A client's query ran: it goes in the Logs tab like any other. */
+  onMcatzpLog: (cb: (e: { connId: string; text: string; ms: number; affected: number | null; error: string | null }) => void) => on('viewer:mcatzpLog', cb),
+  /** The main process asks for what only the window holds; answered with mcatzpWindowReply. */
+  onMcatzpRead: (cb: (req: { id: string; what: 'log' | 'history'; connId: string; db: string }) => void) => on('viewer:mcatzpRead', cb),
   /** Install MCatzP running in Settings. */
   onMcatzpInstalling: (cb: (p: McatzpInstallProgress | null) => void) => on('viewer:mcatzpInstalling', cb),
   /** The first error while Send crash reports was never answered: ask once. */

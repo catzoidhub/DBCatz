@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain, shell } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
@@ -40,6 +41,24 @@ const ai = new AskAi(viewer);
 const updater = new Updater();
 const reporter = new Reporter();
 let mcatzp: Mcatzp;
+const windowReads = new Map<string, (data: unknown) => void>();
+/** What only the window holds (Logs, History). No window, or none answering: there is nothing to read. */
+function askWindow<T>(what: 'log' | 'history', connId: string, db: string): Promise<T[]> {
+  const w = viewerWindow();
+  if (!w || w.isDestroyed()) return Promise.resolve([]);
+  const id = randomUUID();
+  return new Promise((done) => {
+    const timer = setTimeout(() => {
+      windowReads.delete(id);
+      done([]);
+    }, 3000);
+    windowReads.set(id, (data) => {
+      clearTimeout(timer);
+      done(Array.isArray(data) ? (data as T[]) : []);
+    });
+    w.webContents.send('viewer:mcatzpRead', { id, what, connId, db });
+  });
+}
 let mcatzpInstalling: AbortController | null = null;
 const clientId = (id: unknown) => {
   const known = MCATZP_TARGETS.find((t) => t === id);
@@ -201,6 +220,10 @@ function api(): DbCatzApi {
       return mcatzpSetup.targets();
     },
     mcatzpPending: async () => mcatzp.pending(),
+    mcatzpWindowReply: async (id, data) => {
+      windowReads.get(String(id))?.(data);
+      windowReads.delete(String(id));
+    },
     mcatzpAnswer: async (id, answer, typed) => mcatzp.answer(String(id), answer === 'once' || answer === 'session' ? answer : 'deny', typeof typed === 'string' ? typed : undefined),
     openUrl: async (url) => {
       // app:licenses — the third-party licences shipped inside the app (Catzoid #66), readable offline
@@ -272,15 +295,18 @@ app.whenReady().then(() => {
       return r;
     });
   const send = (channel: string, payload: unknown) => viewerWindow()?.webContents.send(channel, payload);
-  mcatzp = new Mcatzp(
-    api(),
-    viewer,
-    (ask) => {
+  mcatzp = new Mcatzp(api(), viewer, {
+    show: (ask) => {
       if (ask) showViewer();
       send('viewer:mcatzpAsk', ask);
     },
-    () => send('viewer:settings', settings()),
-  );
+    settingsChanged: () => send('viewer:settings', settings()),
+    open: (page) => openViewer(page.connId, page.db, { table: page.table }),
+    refresh: () => send('viewer:command', { command: 'refresh' }),
+    logQuery: (connId, r) => send('viewer:mcatzpLog', { connId, ...r }),
+    queryLog: (connId) => askWindow('log', connId, ''),
+    queryHistory: (connId, db) => askWindow('history', connId, db),
+  });
   void mcatzp.set(settings().mcatzp.on).catch(() => undefined);
   viewer.onJobs = (jobs) => send('viewer:jobs', jobs);
   viewer.onProgress = (p) => send('viewer:progress', p);
