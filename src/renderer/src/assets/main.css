@@ -2083,7 +2083,7 @@ button.dv-card-head:hover {
   bottom: 3.25rem;
 }
 
-/* The Connections list's DevCatz card (DvDevCatzInstall.vue): DevCatz's own indigo, since it points at DevCatz. */
+/* The Connections list's app card (DvAppInstall.vue): the app's own colour, since it points at that app. */
 .dv-devcatz-card {
   --dc: oklch(57% 0.2 283);
   display: flex;
@@ -2121,6 +2121,13 @@ button.dv-card-head:hover {
 .dv-devcatz-btn:hover {
   filter: brightness(1.06);
   transform: translateY(-1px);
+}
+.is-docatz {
+  --dc: oklch(58% 0.14 240);
+}
+.is-docatz .dv-devcatz-btn {
+  color: oklch(98% 0.01 240);
+  background: linear-gradient(135deg, oklch(62% 0.13 240), oklch(50% 0.14 246));
 }
 .dv-devcatz-btn img {
   border-radius: 0.3rem;

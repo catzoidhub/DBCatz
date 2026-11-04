@@ -1,7 +1,7 @@
 import { DV_ASK_DESTRUCTIVE, DV_ASK_WRITES, type DvAskAction, type DvConnection } from '@shared/types';
 import { statementKind } from '@shared/dbsafety';
 import { splitStatements } from '@shared/sqlsplit';
-import { api, openDevCatzDownload, saveSettings, settingsTab, showSettings } from '../store';
+import { api, openAppDownload, saveSettings, settingsTab, showSettings } from '../store';
 import { goTo } from './nav';
 import { active, connections, dispatch, editing, isKv, isProd, isReadOnly, isSql, refreshConnections, showJobs } from './viewer';
 import { words } from '@shared/platform';
@@ -132,12 +132,15 @@ export async function runAsk(a: DvAskAction): Promise<string> {
     case 'open-devcatz': {
       if (!conn.serviceId) throw new Error(`${conn.name} is not a DevCatz or DoCatz service`);
       if (conn.serviceApp === 'DoCatz') {
-        if (!(await api.openInDoCatz(conn.serviceId))) throw new Error(`DoCatz is not installed on ${words.thisComputer}`);
+        if (!(await api.openInDoCatz(conn.serviceId))) {
+          await openAppDownload('DoCatz');
+          throw new Error(`DoCatz is not installed on ${words.thisComputer}: its download page is open`);
+        }
         return `DoCatz opened${conn.running ? '' : `: start ${conn.project || conn.name} there`}`;
       }
       const found = await api.openInDevCatz(conn.serviceId);
       if (!found) {
-        await openDevCatzDownload();
+        await openAppDownload('DevCatz');
         throw new Error(`DevCatz is not installed on ${words.thisComputer}: its download page is open`);
       }
       return `DevCatz opened at ${conn.name}${conn.running ? '' : ': start it there'}`;

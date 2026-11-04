@@ -2,7 +2,7 @@
 import { keyLabel, words as platformWords } from '@shared/platform';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection, DvTable } from '@shared/types';
-import { attempt, api, notify, openDevCatzDownload } from '../store';
+import { attempt, api, notify, openAppDownload, openInDoCatz } from '../store';
 import CatMood from './CatMood.vue';
 import { DB_LOGO } from '../db';
 import DvProgress from './DvProgress.vue';
@@ -578,15 +578,12 @@ function contextMenu(t: DvTable) {
   void api.dvTableMenu(t.name, kindOf(t));
 }
 const tableIcon = (t: DvTable) => (t.type === 'view' ? 'M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Zm8 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z' : 'M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15.5v-11ZM4.5 7v2.5h4.75V7H4.5Zm6.25 0v2.5h4.75V7h-4.75ZM4.5 11v2.5h4.75V11H4.5Zm6.25 0v2.5h4.75V11h-4.75Z');
-/** Open in DevCatz / DoCatz on a service's error screen; without the DevCatz app, its download page instead. */
+/** Open in DevCatz / DoCatz on a service's error screen; without the app, its download page instead. */
 async function openService(serviceId: string) {
-  if (c.value.serviceApp === 'DoCatz') {
-    if (!(await api.openInDoCatz(serviceId))) notify('info', `DoCatz is not installed on ${platformWords.thisComputer}`);
-    return;
-  }
+  if (c.value.serviceApp === 'DoCatz') return void (await openInDoCatz(serviceId));
   if (await api.openInDevCatz(serviceId)) return;
   notify('info', `DevCatz is not installed on ${platformWords.thisComputer}: opening its download page`);
-  await openDevCatzDownload();
+  await openAppDownload('DevCatz');
 }
 </script>
 

@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DbEngine, DvConnection, DvConnectionInput, DvLayout, DvMethod, DvMode, DvOptionKey } from '@shared/types';
 import { DV_DEFAULT_OPTIONS, DV_METHOD_NAME, dvMethods, dvOptionSupport } from '@shared/types';
 import { parseDbUrl } from '@shared/dburl';
-import { attempt, api, notify } from '../store';
+import { attempt, api, notify, openInDoCatz } from '../store';
 import { DB_LOGO } from '../db';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import PopMenu from '../components/PopMenu.vue';
@@ -13,7 +13,7 @@ import { groupByType, sortList, useListView } from '../listview';
 import DvProgress from './DvProgress.vue';
 import { COLORS, connections, DEFAULT_PORT, DV_HINT, editing, ENGINE_NAME, newToken, openTab, progress, refreshConnections } from './viewer';
 import DvNavButtons from './DvNavButtons.vue';
-import DvDevCatzInstall from './DvDevCatzInstall.vue';
+import DvAppInstall from './DvAppInstall.vue';
 import devcatzLogo from '../assets/logos/devcatz.png';
 import docatzLogo from '../assets/logos/docatz.png';
 
@@ -33,8 +33,8 @@ const match = (c: DvConnection) => !filter.value || `${c.name} ${c.engine} ${c.h
 const layout = ref<DvLayout>({ order: [], favorites: [], groups: [] });
 /** The DevCatz app itself is here: without it, a left-behind services file lists services nobody can start. */
 const devcatzApp = ref(true);
-/** DoCatz is here: its group shows only then, or while its file still lists containers. */
-const docatzApp = ref(false);
+/** The same for DoCatz. */
+const docatzApp = ref(true);
 async function checkDevCatz() {
   const info = await api.appInfo().catch(() => null);
   devcatzApp.value = !!info?.devcatzPath;
@@ -67,20 +67,28 @@ interface Section {
   items: DvConnection[];
   /** Hint in an empty group. */
   empty?: string;
+  /** The app behind this group is not here: the group holds its install card, and folds away like any other. */
+  offer?: 'DevCatz' | 'DoCatz';
 }
 const sections = computed<Section[]>(() => {
   const all = listed.value.filter(match);
   const c = (key: string) => listView.isCollapsed(key);
   const out: Section[] = [];
+  /** Last in every arrangement, and not while searching: they are not connections. */
+  const withOffers = () => {
+    if (!filter.value && !devcatzApp.value && !out.some((x) => x.key === 'svc')) out.push({ key: 'svc', title: 'DevCatz services', items: [], collapsed: c('svc'), offer: 'DevCatz' });
+    if (!filter.value && !docatzApp.value && !out.some((x) => x.key === 'doc')) out.push({ key: 'doc', title: 'DoCatz services', items: [], collapsed: c('doc'), offer: 'DoCatz' });
+    return out;
+  };
   const favItems = all.filter((x) => favs.value.has(x.id));
   if (favItems.length) out.push({ key: 'fav', title: 'Favorites', items: favItems, collapsed: c('fav') });
   if (view.value.group === 'type') {
     for (const [label, items] of groupByType(all, (x) => ENGINE_NAME[x.engine])) out.push({ key: `t:${label}`, title: label, items, collapsed: c(`t:${label}`) });
-    return out;
+    return withOffers();
   }
   if (view.value.group === 'none') {
     out.push({ key: 'all', title: 'All connections', items: all, collapsed: c('all') });
-    return out;
+    return withOffers();
   }
   const grouped = new Set<string>();
   for (const g of layout.value.groups) {
@@ -94,7 +102,7 @@ const sections = computed<Section[]>(() => {
   if (devcatzApp.value || dev.length) out.push({ key: 'svc', title: 'DevCatz services', items: dev, collapsed: c('svc'), empty: filter.value ? 'Nothing matches' : 'No database service yet. Create one on DevCatz’s Database page.' });
   if (docatzApp.value || doc.length) out.push({ key: 'doc', title: 'DoCatz services', items: doc, collapsed: c('doc'), empty: filter.value ? 'Nothing matches' : 'No database container yet. Start a project with PostgreSQL, MySQL, Redis, MongoDB … in DoCatz.' });
   out.push({ key: 'saved', title: 'Saved connections', items: rest.filter((x) => !x.serviceId), collapsed: c('saved'), empty: filter.value ? 'Nothing matches' : `Connections you set up are kept here; secrets are encrypted with the ${words.secretStoreFull}.` });
-  return out;
+  return withOffers();
 });
 function toggleSection(sec: Section) {
   if (!sec.group) return listView.toggle(sec.key);
@@ -220,7 +228,7 @@ function connMenu(e: MouseEvent, c: DvConnection) {
     ...layout.value.groups.map((g) => ({ label: g.name, checked: g.name === current, action: () => setGroup(c.id, g.name) })),
     { label: 'New group…', action: () => (groupDialog.value = { mode: 'new', id: c.id }) },
     ...(current ? [{ label: `Remove from “${current}”`, action: () => setGroup(c.id, null) }] : []),
-    ...(c.serviceApp === 'DoCatz' ? [{ label: 'Open in DoCatz', separator: true, action: () => void api.openInDoCatz(c.serviceId!) }] : []),
+    ...(c.serviceApp === 'DoCatz' ? [{ label: 'Open in DoCatz', separator: true, action: () => void openInDoCatz(c.serviceId!) }] : []),
     ...(!c.serviceId ? [{ label: 'Edit…', action: () => edit(c), separator: true }, { label: 'Delete…', danger: true, action: () => (removing.value = c) }] : []),
   ]);
 }
@@ -499,16 +507,18 @@ async function keep(c: DvConnection) {
               <svg v-else-if="sec.group" class="size-3 shrink-0 opacity-70" viewBox="0 0 20 20" fill="currentColor"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4l2 2h7A1.5 1.5 0 0 1 18 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5v-9Z" /></svg>
               <span class="truncate">{{ sec.title }}</span>
             </button>
-            <span class="opacity-60">{{ sec.items.length }}</span>
+            <span v-if="!sec.offer" class="opacity-60">{{ sec.items.length }}</span>
             <button v-if="sec.group" type="button" class="dv-row-more" title="Group menu" @click.stop="groupMenu($event, sec.group)">⋯</button>
           </div>
           <template v-if="!sec.collapsed">
-            <DvDevCatzInstall v-if="sec.key === 'svc' && !devcatzApp && sec.items.length" kind="missing" :count="sec.items.length" />
+            <DvAppInstall v-if="sec.offer" :app="sec.offer" kind="none" />
+            <DvAppInstall v-if="sec.key === 'svc' && !devcatzApp && sec.items.length" app="DevCatz" kind="missing" :count="sec.items.length" />
+            <DvAppInstall v-if="sec.key === 'doc' && !docatzApp && sec.items.length" app="DoCatz" kind="missing" :count="sec.items.length" />
             <div
               v-for="c in sec.items"
               :key="sec.key + c.id"
               class="dv-conn dv-row group"
-              :class="{ 'is-editing': editing?.id === c.id, 'drop-before': dropRow === c.id && dragId !== c.id, 'opacity-50': dragId === c.id || (c.serviceApp === 'DevCatz' && !devcatzApp && !c.connected) }"
+              :class="{ 'is-editing': editing?.id === c.id, 'drop-before': dropRow === c.id && dragId !== c.id, 'opacity-50': dragId === c.id || (c.serviceApp === 'DevCatz' && !devcatzApp && !c.connected) || (c.serviceApp === 'DoCatz' && !docatzApp && !c.connected) }"
               draggable="true"
               @dragstart="dragId = c.id"
               @dragover.prevent.stop="dropRow = c.id"
@@ -533,6 +543,7 @@ async function keep(c: DvConnection) {
                   <span v-if="c.method !== 'tcp'" class="dv-chip">{{ DV_METHOD_NAME[c.method] }}</span>
                   <span v-if="c.connected" class="dv-chip is-on">Connected</span>
                   <span v-else-if="c.serviceApp === 'DevCatz' && !devcatzApp" class="dv-chip is-muted" title="DevCatz is not installed, so this service cannot start">DevCatz not installed</span>
+                  <span v-else-if="c.serviceApp === 'DoCatz' && !docatzApp" class="dv-chip is-muted" title="DoCatz is not installed, so this service cannot start">DoCatz not installed</span>
                   <span v-else-if="c.serviceApp === 'DoCatz' && !c.running" class="dv-chip is-muted" title="The container is stopped: start its project in DoCatz">Stopped · start it in DoCatz</span>
                   <span v-else-if="c.serviceId && !c.running && c.engine !== 'sqlite'" class="dv-chip is-muted">Stopped</span>
                 </span>
@@ -549,10 +560,6 @@ async function keep(c: DvConnection) {
             </div>
             <p v-if="!sec.items.length && sec.empty" class="px-3 py-1.5 text-[11px] opacity-50">{{ sec.empty }}</p>
           </template>
-        </section>
-        <section v-if="!devcatzApp && !sections.some((x) => x.key === 'svc')" class="mt-3">
-          <div class="dv-sec-head"><img :src="devcatzLogo" alt="" class="size-3.5 shrink-0" draggable="false" /><span class="flex-1">DevCatz services</span></div>
-          <DvDevCatzInstall kind="none" />
         </section>
         <section v-if="session.length" class="mt-3">
           <div class="dv-sec-head"><span class="flex-1">Opened from a URL</span><span class="opacity-60">{{ session.length }}</span></div>

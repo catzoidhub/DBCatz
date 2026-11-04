@@ -29,18 +29,26 @@ export async function attempt<T>(fn: () => Promise<T>, success?: string): Promis
 export const settings = ref<DbCatzSettings | null>(null);
 export const showSettings = ref(false);
 /**
- * DevCatz's download for this computer from the Catzoid site: `<shared site address>/download/devcatz/<platform>`
- * (mac-arm64, mac-x64, win-x64). No build for this computer → say so and open DevCatz's page, never another
+ * A sibling app's download for this computer from the Catzoid site: `<shared site address>/download/<app>/<platform>`
+ * (mac-arm64, mac-x64, win-x64). No build for this computer → say so and open the app's page, never another
  * platform's file (Catzoid family rule).
  */
-export async function openDevCatzDownload(): Promise<void> {
+export async function openAppDownload(app: 'DevCatz' | 'DoCatz'): Promise<void> {
   const info = await api.appInfo().catch(() => null);
   const site = info?.site ?? 'https://catzoid.com';
+  const slug = app.toLowerCase();
   if (!info?.platform) {
-    notify('info', 'There is no DevCatz build for this computer yet.');
-    return void api.openUrl(`${site}/devcatz`);
+    notify('info', `There is no ${app} build for this computer yet.`);
+    return void api.openUrl(`${site}/${slug}`);
   }
-  await api.openUrl(`${site}/download/devcatz/${info.platform}`);
+  await api.openUrl(`${site}/download/${slug}/${info.platform}`);
+}
+/** Open in DoCatz; without the app, says so and opens its download page. */
+export async function openInDoCatz(serviceId: string): Promise<boolean> {
+  if (await api.openInDoCatz(serviceId)) return true;
+  notify('info', 'DoCatz is not installed here: opening its download page');
+  await openAppDownload('DoCatz');
+  return false;
 }
 /** The Settings tab to show (Ask DBCatz's open-settings sets it). */
 export const settingsTab = ref<'appearance' | 'ai' | 'mcatzp' | 'updates' | 'about'>('appearance');
