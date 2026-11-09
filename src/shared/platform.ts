@@ -48,3 +48,10 @@ export function keyLabel(combo: string, os: OS = currentOS): string {
   const parts = combo.split('+').map((p) => { const n = names[p.toLowerCase()]; return n ? n[mac ? 0 : 1] : p; });
   return parts.join(mac ? '' : '+');
 }
+
+/** The build with its OS (user, 2026-11-09): "macOS Apple silicon", "macOS Intel", "Windows x64", "Linux ARM64". Only a Mac says Apple silicon or Intel. */
+export function buildLabel(os: OS, arch: string): string {
+  if (!arch) return '';
+  const cpu = os === 'mac' ? (arch === 'arm64' ? 'Apple silicon' : arch === 'x64' ? 'Intel' : arch) : arch === 'arm64' ? 'ARM64' : arch;
+  return `${wordsFor(os).os} ${cpu}`;
+}

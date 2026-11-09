@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { words } from '@shared/platform';
+import { buildLabel, currentOS, words } from '@shared/platform';
 import { computed, onMounted, ref } from 'vue';
 import type { AboutInfo } from '@shared/types';
 import { api, attempt, notify, reportOpen, update, updateOpen } from '../store';
@@ -29,7 +29,7 @@ onMounted(async () => {
 });
 
 
-const arch = computed(() => (info.value?.arch === 'arm64' ? 'Apple silicon' : info.value?.arch === 'x64' ? 'Intel' : (info.value?.arch ?? '')));
+const arch = computed(() => buildLabel(currentOS, info.value?.arch ?? ''));
 const host = computed(() => (info.value ? new URL(info.value.site).host : ''));
 const links = computed(() => {
   const site = info.value?.site;
@@ -61,7 +61,7 @@ function checkUpdates() {
 function copyDetails() {
   const i = info.value;
   if (!i) return;
-  void navigator.clipboard.writeText(`DBCatz ${i.version} (${i.arch})\n${words.os} ${i.macos}\nElectron ${i.electron} · Chromium ${i.chrome} · Node.js ${i.node}`);
+  void navigator.clipboard.writeText(`DBCatz ${i.version} (${arch.value})\n${words.os} ${i.macos}\nElectron ${i.electron} · Chromium ${i.chrome} · Node.js ${i.node}`);
   notify('success', 'Version details copied');
 }
 </script>
