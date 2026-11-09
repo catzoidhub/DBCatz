@@ -242,6 +242,20 @@ function api(): DbCatzApi {
       void checkMcatzpUpdate();
       return mcatzpSetup.setupState();
     },
+    mcatzpUninstall: async () => {
+      if (mcatzpInstalling) throw new Error('MCatzP is being installed');
+      // The channel closes first: assistants connected now lose it rather than a missing program.
+      if (settings().mcatzp.on) {
+        setSettings({ mcatzp: { on: false } });
+        await mcatzp.set(false);
+        mcatzp.scopesChanged();
+      }
+      const r = await mcatzpSetup.uninstall();
+      mcatzpUpdate = null;
+      viewerWindow()?.webContents.send('viewer:mcatzpUpdate', null);
+      viewerWindow()?.webContents.send('viewer:settings', settings());
+      return r;
+    },
     mcatzpInstallCancel: async () => mcatzpInstalling?.abort(),
     mcatzpApprovals: () => mcatzpSetup.approvals(),
     mcatzpTargets: () => mcatzpSetup.targets(),
