@@ -46,7 +46,7 @@ const uninstallAsk = ref(false);
 const uninstalling = ref(false);
 const uninstallText = computed(() => {
   const where = targets.value.filter((t) => t.current).map((t) => t.label);
-  const copy = setup.value?.source === 'catzoid' ? `The program (${setup.value.path}) is removed. ` : setup.value?.path ? `Your own copy (${setup.value.path}) stays: remove it the way you installed it. ` : '';
+  const copy = setup.value?.source === 'catzoid' ? `The program (${setup.value.path}) is removed. ` : setup.value?.path ? `Your own copy (${setup.value.path}) stays: remove it the way you installed it${setup.value.source === 'homebrew' ? ' (brew uninstall mcatzp)' : ''}. ` : '';
   return `${where.length ? `It is taken out of ${where.join(', ')}. ` : ''}${copy}Every Catzoid app shares MCatzP, so they lose it too; this app's MCatzP switch turns off. Install it again any time.`;
 });
 async function uninstallMcatzp() {
@@ -55,7 +55,8 @@ async function uninstallMcatzp() {
   uninstalling.value = false;
   uninstallAsk.value = false;
   if (!r) return;
-  notify('success', r.binary === 'kept' ? `MCatzP taken out of the assistants; your copy at ${r.keptPath} stays` : 'MCatzP uninstalled');
+  if (r.failed.length) notify('error', `MCatzP could not be taken out of ${r.failed.map((f) => `${f.client} (${f.error})`).join(', ')}`);
+  notify('success', r.binary === 'kept' ? `MCatzP taken out of the assistants; your copy at ${r.keptPath} stays${r.keptHow ? ` (remove it with ${r.keptHow})` : ''}` : 'MCatzP uninstalled');
   setup.value = (await attempt(() => api.mcatzpSetup(false))) ?? setup.value;
   void loadTargets();
 }

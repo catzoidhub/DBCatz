@@ -1,6 +1,5 @@
-import { existsSync, readdirSync, rmSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { approvalsAcrossApps, installPath, type McatzpApproval, addToClient as add, install as run, type McatzpInstallProgress, type McatzpSetup, type McatzpTarget, removeFromClient as remove, setupState as state, targets as list, type McatzpTargetId, type SetupOptions } from '@catzoid/mcatzp-host';
+import type { McatzpUninstallResult } from '@shared/types';
+import { approvalsAcrossApps, uninstall as removeAll, type McatzpApproval, addToClient as add, install as run, type McatzpInstallProgress, type McatzpSetup, type McatzpTarget, removeFromClient as remove, setupState as state, targets as list, type McatzpTargetId, type SetupOptions } from '@catzoid/mcatzp-host';
 import { execFile } from 'node:child_process';
 import { siteBase } from '../shared';
 
@@ -39,29 +38,21 @@ export const addToClient = async (id: McatzpTargetId): Promise<void> => add(awai
 export const removeFromClient = async (id: McatzpTargetId): Promise<void> => remove(await options(), id);
 
 /**
- * Uninstall MCatzP (user, 2026-11-10; the same in every Catzoid app, as DevCatz c0a4291): its entry is taken out of
- * every AI assistant that has one, and the shared copy goes when a Catzoid app installed it (~/.catzoid/bin/mcatzp,
- * %LOCALAPPDATA%\\Catzoid\\bin); a Homebrew / npm / other copy is left to the tool that put it there, and its path is
- * returned to say so. The other Catzoid apps lose MCatzP too: the window asks first.
+ * Uninstall MCatzP (user, 2026-11-10; every Catzoid app the same): the host's uninstall (MCatzP 1.0.3) takes the entries
+ * that run the copy in use out of their clients and removes the shared copy; a Homebrew / npm copy is kept and named,
+ * with the command that removes it. Client names instead of ids, for the window.
  */
-export async function uninstall(): Promise<{ removedFrom: string[]; binary: 'removed' | 'kept' | 'none'; keptPath: string | null }> {
+export async function uninstall(): Promise<McatzpUninstallResult> {
   const o = await options();
-  const removedFrom: string[] = [];
-  for (const t of await list(o)) {
-    if (!t.current) continue;
-    await remove(o, t.id);
-    removedFrom.push(t.label);
-  }
-  const s = await state(o, false);
-  if (!s.path) return { removedFrom, binary: 'none', keptPath: null };
-  if (s.source !== 'catzoid') return { removedFrom, binary: 'kept', keptPath: s.path };
-  const file = installPath(o);
-  rmSync(file, { force: true });
-  // The bin folder too, when MCatzP was all it held.
-  try {
-    if (existsSync(dirname(file)) && !readdirSync(dirname(file)).length) rmSync(dirname(file), { recursive: true, force: true });
-  } catch {
-    /* in use or not ours to clear */
-  }
-  return { removedFrom, binary: 'removed', keptPath: null };
+  const before = await state(o, false);
+  const labels = new Map((await list(o)).map((t) => [t.id, t.label]));
+  const r = await removeAll(o);
+  const how = r.binary !== 'kept' ? null : before.source === 'homebrew' ? 'brew uninstall mcatzp' : /node_modules|[\\/]npm[\\/]/.test(r.keptPath ?? '') ? 'npm uninstall -g mcatzp' : null;
+  return {
+    removedFrom: r.removedFrom.map((id) => labels.get(id) ?? id),
+    failed: r.failed.map((f) => ({ client: labels.get(f.id) ?? f.id, error: f.error })),
+    binary: r.binary,
+    keptPath: r.keptPath,
+    keptHow: how,
+  };
 }

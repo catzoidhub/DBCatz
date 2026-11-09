@@ -48,6 +48,15 @@ export interface DbCatzSettings {
 }
 
 /** Settings → MCatzP: the local channel an AI client reaches DBCatz through. DBCatz's own, per computer. */
+/** Uninstall MCatzP's result (the host's, with client names): `keptHow` is the command for a Homebrew / npm copy. */
+export interface McatzpUninstallResult {
+  removedFrom: string[];
+  failed: { client: string; error: string }[];
+  binary: 'removed' | 'kept' | 'none';
+  keptPath: string | null;
+  keptHow: string | null;
+}
+
 export interface DvMcatzpSettings {
   /** The switch. Off by default. */
   on: boolean;
@@ -841,7 +850,7 @@ export interface DbCatzApi {
   /** Installs or updates MCatzP; progress as viewer:mcatzpInstalling events. */
   mcatzpInstall(): Promise<McatzpSetup>;
   /** Takes MCatzP out of every assistant and removes the copy a Catzoid app installed; turns this app's switch off. */
-  mcatzpUninstall(): Promise<{ removedFrom: string[]; binary: 'removed' | 'kept' | 'none'; keptPath: string | null }>;
+  mcatzpUninstall(): Promise<McatzpUninstallResult>;
   mcatzpInstallCancel(): Promise<void>;
   /** The MCatzP version to update to, for the badges in Settings; null when up to date. Later ones come as viewer:mcatzpUpdate events. */
   mcatzpUpdate(): Promise<string | null>;
