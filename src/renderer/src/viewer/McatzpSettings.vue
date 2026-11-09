@@ -47,7 +47,7 @@ const uninstalling = ref(false);
 const uninstallText = computed(() => {
   const where = targets.value.filter((t) => t.current).map((t) => t.label);
   const copy = setup.value?.source === 'catzoid' ? `The program (${setup.value.path}) is removed. ` : setup.value?.path ? `Your own copy (${setup.value.path}) stays: remove it the way you installed it. ` : '';
-  return `${where.length ? `It is taken out of ${where.join(', ')}. ` : ''}${copy}Every Catzoid app shares MCatzP, so they lose it too; DBCatz's MCatzP switch turns off. Install it again any time.`;
+  return `${where.length ? `It is taken out of ${where.join(', ')}. ` : ''}${copy}Every Catzoid app shares MCatzP, so they lose it too; this app's MCatzP switch turns off. Install it again any time.`;
 });
 async function uninstallMcatzp() {
   uninstalling.value = true;
