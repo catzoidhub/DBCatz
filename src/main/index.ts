@@ -1,5 +1,6 @@
 import { app, dialog, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
@@ -16,6 +17,7 @@ import { openCatzoidApp, platformId } from './companion';
 import { Mcatzp } from './mcatzp';
 import * as mcatzpSetup from './mcatzp/install';
 import { MCATZP_TARGETS } from '@catzoid/mcatzp-host';
+import { offerAppImageInstall } from './appimage';
 
 /**
  * DBCatz — a database viewer for MySQL / MariaDB, PostgreSQL, SQLite, Redis /
@@ -110,8 +112,9 @@ function handleLink(raw: string): void {
   }
 }
 
-// One instance: a second launch (Finder, a link) goes to the running one.
-if (!app.requestSingleInstanceLock()) app.quit();
+// One instance: a second launch (Finder, a link) goes to the running one. It exits at once: app.quit() still let it
+// reach whenReady and flash a window of its own with the link (seen on Linux, where links start a second process).
+if (!app.requestSingleInstanceLock()) app.exit(0);
 app.on('second-instance', (_e, argv) => {
   const link = argv.find((a) => a.startsWith('dbcatz://'));
   if (link) handleLink(link);
@@ -123,13 +126,27 @@ app.on('open-url', (e, url) => {
   else app.once('ready', () => handleLink(url));
 });
 app.on('activate', () => openViewer(null));
+/** True while the AppImage install window is the only window (closing it for "Just run it" must not quit). */
+let offeringInstall = false;
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin' && !offeringInstall) app.quit();
 });
 app.on('before-quit', () => {
   mcatzp?.quit();
   void viewer.closeAll();
 });
+
+/** The OS version for About: on Linux the distribution (/etc/os-release, e.g. "Ubuntu 24.04.3 LTS"), not the kernel. */
+function systemVersion(): string {
+  if (process.platform !== 'linux') return process.getSystemVersion();
+  try {
+    const name = /^PRETTY_NAME="?([^"\n]+)"?/m.exec(readFileSync('/etc/os-release', 'utf8'))?.[1];
+    if (name) return `${name} (kernel ${process.getSystemVersion()})`;
+  } catch {
+    /* no os-release */
+  }
+  return process.getSystemVersion();
+}
 
 /** A started job runs on; its end (and any error) reaches the window through the Jobs list. */
 function background(job: Promise<string>, path: string): string {
@@ -147,7 +164,7 @@ function api(): DbCatzApi {
     aboutInfo: async () => ({
       version: app.getVersion(),
       arch: process.arch,
-      macos: process.getSystemVersion(),
+      macos: systemVersion(),
       electron: process.versions.electron,
       chrome: process.versions.chrome,
       node: process.versions.node,
@@ -301,7 +318,12 @@ function api(): DbCatzApi {
   };
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Linux AppImage run from Downloads: the install window first (it restarts DBCatz from ~/Applications; Catzoid #93).
+  offeringInstall = true;
+  const restarting = await offerAppImageInstall(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'));
+  offeringInstall = false;
+  if (restarting) return;
   if (app.isPackaged) app.setAsDefaultProtocolClient('dbcatz'); // not the dev Electron binary
   const impl = api() as unknown as Record<string, (...args: unknown[]) => unknown>;
   // Saving or removing a connection rewrites bridge.json (DialCatz reads it).

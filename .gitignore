@@ -5,3 +5,4 @@ dist-quick/
 .DS_Store
 *.log
 dist-win/
+dist-linux/

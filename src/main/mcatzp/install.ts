@@ -8,7 +8,7 @@ function loginEnv(): Promise<NodeJS.ProcessEnv> {
   if (process.platform === 'win32') return Promise.resolve(process.env);
   shellEnv ??= new Promise((done) => {
     const marker = '__DBCATZ_ENV__';
-    execFile(process.env.SHELL || '/bin/zsh', ['-ilc', `echo ${marker}; env; echo ${marker}`], { timeout: 8000, maxBuffer: 4 * 1024 * 1024 }, (_e, out) => {
+    execFile(process.env.SHELL || (process.platform === 'linux' ? '/bin/bash' : '/bin/zsh'), ['-ilc', `echo ${marker}; env; echo ${marker}`], { timeout: 8000, maxBuffer: 4 * 1024 * 1024 }, (_e, out) => {
       const body = String(out ?? '').split(marker)[1] ?? '';
       const env: NodeJS.ProcessEnv = { ...process.env };
       for (const line of body.split('\n')) {

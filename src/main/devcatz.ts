@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { DevCatzService, DevCatzServicesFile } from '@shared/types';
 import { findCatzoidApp } from './companion';
+import { appDataDir } from './platform';
 
 /**
  * DevCatz and DoCatz integration: each writes the database services it runs to
@@ -12,9 +13,8 @@ import { findCatzoidApp } from './companion';
  * contract.
  */
 
-/** An app's data folder: ~/Library/Application Support/<App> on a Mac, %APPDATA%\<App> on Windows. */
-const dataDir = (app: string) =>
-  process.platform === 'win32' ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), app) : join(homedir(), 'Library', 'Application Support', app);
+/** An app's data folder: ~/Library/Application Support/<App>, %APPDATA%\\<App>, ~/.config/<App> on Linux. */
+const dataDir = (app: string) => appDataDir(app);
 
 export type ServicesApp = 'DevCatz' | 'DoCatz';
 const APPS: Record<ServicesApp, { scheme: string; bundleId: string; env: string }> = {

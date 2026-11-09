@@ -4,7 +4,9 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, wat
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { DvAiProvider, Theme } from '@shared/types';
-import { isWin } from './platform';
+import { appDataDir, isLinux, isWin } from './platform';
+import { run } from './proc';
+import { runAsRootLinux } from './linuxadmin';
 
 /**
  * Settings shared by the Catzoid apps (DevCatz, DBCatz, later DialCatz): the theme and the AI connection
@@ -21,13 +23,15 @@ import { isWin } from './platform';
  *   Keychain: generic password, service "Catzoid AI", account = provider id, password = the API key.
  *   Windows: %APPDATA%\Catzoid\shared.json; the keys DPAPI-encrypted for the user in Catzoid\keys\<provider>.dpapi
  *   (PowerShell's ConvertFrom-SecureString), as DevCatz does.
+ *   Linux: ~/.config/Catzoid/shared.json; the keys in the desktop's keyring through the Secret Service (secret-tool),
+ *   attributes service "Catzoid AI" + account = provider, the same items as DevCatz and DoCatz.
  *   On / off switches (AI enabled, features) stay in each app.
  *
  * CATZOID_SHARED_DIR and CATZOID_KEYCHAIN (a keychain file) point both elsewhere, for tests.
  */
 
 export const SHARED_DIR =
-  process.env.CATZOID_SHARED_DIR || (isWin ? join(process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming'), 'Catzoid') : join(homedir(), 'Library', 'Application Support', 'Catzoid'));
+  process.env.CATZOID_SHARED_DIR || appDataDir('Catzoid');
 const FILE = join(SHARED_DIR, 'shared.json');
 const SERVICE = 'Catzoid AI';
 const ME = 'dbcatz';
@@ -137,6 +141,35 @@ const keyCache = new Map<DvAiProvider, { at: number; key: string }>();
  * of the same user reads it, as the Keychain item on macOS (the same files as DevCatz). The key goes in through stdin,
  * never the command line.
  */
+/**
+ * Linux: the desktop's keyring through the Secret Service (secret-tool), attributes service + account — the same
+ * items DevCatz and DoCatz read and write. secret-tool is not on a fresh Ubuntu: saving installs it (libsecret-tools)
+ * through one password prompt; reading without it finds no key.
+ */
+async function hasSecretTool(): Promise<boolean> {
+  return (await run('/bin/sh', ['-c', 'command -v secret-tool'], { timeout: 5000 })).code === 0;
+}
+async function linuxKey(provider: DvAiProvider): Promise<string> {
+  if (!(await hasSecretTool())) return '';
+  const r = await run('secret-tool', ['lookup', 'service', SERVICE, 'account', provider], { timeout: 15_000 });
+  return r.code === 0 ? r.stdout.replace(/\n$/, '') : '';
+}
+async function setLinuxKey(provider: DvAiProvider, key: string): Promise<void> {
+  if (!key) {
+    if (await hasSecretTool()) await run('secret-tool', ['clear', 'service', SERVICE, 'account', provider], { timeout: 15_000 });
+    return;
+  }
+  if (!(await hasSecretTool())) {
+    await runAsRootLinux(
+      'if command -v apt-get >/dev/null 2>&1; then DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libsecret-tools >/dev/null; elif command -v dnf >/dev/null 2>&1; then dnf install -y -q libsecret >/dev/null; fi',
+    );
+    if (!(await hasSecretTool())) throw new Error('Saving needs secret-tool from your package manager (sudo apt install libsecret-tools)');
+  }
+  // The key goes on stdin, never in a process list.
+  const r = await run('secret-tool', ['store', `--label=${SERVICE} (${provider})`, 'service', SERVICE, 'account', provider], { input: key, timeout: 60_000 });
+  if (r.code !== 0) throw new Error(`Keyring: ${r.stderr.trim() || `exit ${r.code}`} (is a keyring such as GNOME Keyring running and unlocked?)`);
+}
+
 const keyFile = (provider: DvAiProvider) => join(SHARED_DIR, 'keys', `${provider}.dpapi`);
 const psQuote = (s: string) => `'${s.replace(/'/g, "''")}'`;
 function powershell(script: string, input = ''): Promise<{ code: number; out: string }> {
@@ -176,8 +209,8 @@ async function setWinKey(provider: DvAiProvider, key: string): Promise<void> {
 export async function sharedKey(provider: DvAiProvider): Promise<string> {
   const hit = keyCache.get(provider);
   if (hit && Date.now() - hit.at < 60_000) return hit.key;
-  if (isWin) {
-    const key = await winKey(provider);
+  if (isWin || isLinux) {
+    const key = isWin ? await winKey(provider) : await linuxKey(provider);
     keyCache.set(provider, { at: Date.now(), key });
     return key;
   }
@@ -193,6 +226,8 @@ export async function setSharedKey(provider: DvAiProvider, key: string): Promise
   if (isWin) {
     if (/["\\\n\r]/.test(k)) throw new Error('That key has characters an API key does not have');
     await setWinKey(provider, k);
+  } else if (isLinux) {
+    await setLinuxKey(provider, k);
   } else if (!k) {
     await security(['delete-generic-password', '-s', SERVICE, '-a', provider, ...KEYCHAIN]);
   } else {

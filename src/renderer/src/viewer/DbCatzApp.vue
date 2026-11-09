@@ -180,7 +180,8 @@ onBeforeUnmount(() => {
  * button opens the app menu, and a shortcut the page left alone (as the Mac menu gets it after the page) runs its
  * menu item.
  */
-const isWin = currentOS === 'windows';
+// Windows and Linux: no menu bar (the window draws its own buttons), so the ☰ menu and its shortcuts.
+const isWin = currentOS !== 'mac';
 let menuKeys = new Set<string>();
 const CODE_KEY: Record<string, string> = { Comma: ',', Period: '.', Slash: '/', BracketLeft: '[', BracketRight: ']', Backspace: 'backspace', Delete: 'delete', Enter: 'enter', NumpadEnter: 'enter', Tab: 'tab', Escape: 'escape' };
 function onMenuKey(e: KeyboardEvent) {

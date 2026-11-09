@@ -101,6 +101,10 @@ export class DbViewerManager {
   private enc(v: string): string {
     if (!v) return '';
     if (!safeStorage.isEncryptionAvailable()) throw new Error(`${words.secretStoreFull} encryption is not available`);
+    // Linux without a keyring (GNOME Keyring, KWallet): Electron falls back to a fixed key, which only hides the text.
+    // Say so instead of saving a password as if it were protected.
+    if (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')
+      throw new Error('No system keyring is running (GNOME Keyring or KWallet), so DBCatz cannot keep this secret safely. Start or install one, then save again');
     return safeStorage.encryptString(v).toString('base64');
   }
   private dec(v: string | undefined): string {

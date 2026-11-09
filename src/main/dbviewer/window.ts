@@ -1,6 +1,9 @@
 import { app, BrowserWindow, Menu, nativeTheme, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
-import { isWin } from '../platform';
+import { isLinux, isWin } from '../platform';
+
+/** Windows and Linux: no menu bar, the system buttons drawn over the tab strip (titleBarOverlay), the ☰ menu. */
+const overlay = isWin || isLinux;
 
 /**
  * The DBCatz window: one window with a tab per connection. Opening a
@@ -80,9 +83,11 @@ export interface ViewerTarget {
  * background they vanish in dark mode), as tall as the tab strip; repainted when the theme changes. As DevCatz.
  */
 function titleBarOverlay(): { color: string; symbolColor: string; height: number } {
+  // Linux (GNOME): the buttons bring their own round grey backgrounds, so no strip behind them (as DevCatz and DoCatz).
+  if (isLinux) return { color: '#00000000', symbolColor: nativeTheme.shouldUseDarkColors ? '#e5e7eb' : '#1f2937', height: 52 };
   return nativeTheme.shouldUseDarkColors ? { color: '#2b2d34', symbolColor: '#e5e7eb', height: 52 } : { color: '#e7e8ec', symbolColor: '#1f2937', height: 52 };
 }
-if (isWin) nativeTheme.on('updated', () => win && !win.isDestroyed() && win.setTitleBarOverlay(titleBarOverlay()));
+if (overlay) nativeTheme.on('updated', () => win && !win.isDestroyed() && win.setTitleBarOverlay(titleBarOverlay()));
 
 /** Brings the window up as it is, without changing what it shows; opens it when closed. */
 export function showViewer(): void {
@@ -105,9 +110,9 @@ export function openViewer(connId: string | null, db?: string, target: ViewerTar
     minWidth: 860,
     minHeight: 520,
     title: 'DBCatz',
-    ...(isWin
+    ...(overlay
       ? {
-          // Windows: the tab strip is the title bar; the system buttons sit over its right end (Catzoid #76).
+          // Windows and Linux: the tab strip is the title bar; the system buttons sit over its right end (Catzoid #76).
           titleBarStyle: 'hidden' as const,
           titleBarOverlay: titleBarOverlay(),
           backgroundColor: nativeTheme.shouldUseDarkColors ? '#1d1f24' : '#f6f7f9',
@@ -159,7 +164,7 @@ function viewerMenu(): MenuItemConstructorOptions[] {
   return [
     {
       label: app.name,
-      submenu: isWin
+      submenu: overlay
         ? [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'quit', label: 'Exit' }]
         : [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'services' }, sep, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, sep, { role: 'quit' }],
     },
@@ -216,7 +221,7 @@ function viewerMenu(): MenuItemConstructorOptions[] {
     { label: 'Go', submenu: [item('Back', 'navBack', 'CmdOrCtrl+['), item('Forward', 'navForward', 'CmdOrCtrl+]')] },
     {
       role: 'windowMenu',
-      submenu: isWin
+      submenu: overlay
         ? [{ role: 'minimize' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab')]
         : [{ role: 'minimize' }, { role: 'zoom' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab'), sep, { role: 'front' }],
     },

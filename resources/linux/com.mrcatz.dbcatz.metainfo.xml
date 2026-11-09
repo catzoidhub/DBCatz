@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream data for the .deb (Ubuntu App Center / GNOME Software show it when the package is opened), so the
+     Linux install page has the same care as the DMG window and the Windows installer (Catzoid #93, DBCatz TODO §18). -->
+<component type="desktop-application">
+  <id>com.mrcatz.dbcatz</id>
+  <name>DBCatz</name>
+  <summary>A database client for MySQL, PostgreSQL, SQLite, Redis, MongoDB and more</summary>
+  <developer id="com.catzoid">
+    <name>Catzoid</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <description>
+    <p>
+      DBCatz is a database client with a tab per connection: browse tables, filter and edit rows, run queries and
+      change structure, on your own computer, over SSH, with AWS IAM or Vault.
+    </p>
+    <ul>
+      <li>MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch</li>
+      <li>Rows you can filter, sort and edit, a query editor with history, and table structure in plain words</li>
+      <li>Production connections ask before anything that changes data</li>
+      <li>Export, import and backups that run in the background</li>
+      <li>Works with DevCatz, DoCatz and DialCatz, and an AI helper that explains queries and errors</li>
+    </ul>
+    <p>Passwords stay in the system keyring; nothing leaves your computer unless you connect somewhere.</p>
+  </description>
+  <launchable type="desktop-id">dbcatz.desktop</launchable>
+  <branding>
+    <color type="primary" scheme_preference="light">#eba24a</color>
+    <color type="primary" scheme_preference="dark">#2f2878</color>
+  </branding>
+  <url type="homepage">https://catzoid.com/dbcatz</url>
+  <url type="help">https://catzoid.com/docs</url>
+  <url type="bugtracker">https://github.com/catzoidhub/DBCatz/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A table's rows, filtered and ready to edit</caption>
+      <image>https://catzoid.com/screens/dbcatz/data-light.webp</image>
+    </screenshot>
+    <screenshot>
+      <caption>Every connection in one place</caption>
+      <image>https://catzoid.com/screens/dbcatz/connections-light.webp</image>
+    </screenshot>
+    <screenshot>
+      <caption>The query editor</caption>
+      <image>https://catzoid.com/screens/dbcatz/query-light.webp</image>
+    </screenshot>
+    <screenshot>
+      <caption>A table's structure</caption>
+      <image>https://catzoid.com/screens/dbcatz/structure-light.webp</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Development</category>
+  </categories>
+  <keywords>
+    <keyword>database</keyword>
+    <keyword>sql</keyword>
+    <keyword>mysql</keyword>
+    <keyword>postgresql</keyword>
+    <keyword>redis</keyword>
+  </keywords>
+  <provides>
+    <binary>dbcatz</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.1.0" date="2026-11-05"/>
+  </releases>
+</component>

@@ -149,9 +149,9 @@ export class Updater {
     }
     const lastChecked = Date.now();
     save({ lastChecked });
-    // No Windows build on the feed yet (latest.yml missing, as while the installer waits for signing): nothing newer
-    // for this copy, not a failure.
-    if (error && process.platform === 'win32' && /\b404\b/.test(error)) error = '';
+    // No build for this platform on the feed yet (latest.yml / latest-linux.yml missing): nothing newer for this copy,
+    // not a failure. Every platform but macOS, whose feed always exists.
+    if (error && process.platform !== 'darwin' && /\b404\b/.test(error)) error = '';
     if (error) {
       this.set({ status: 'error', error: `Could not reach the update feed: ${error}`, lastChecked });
       return this.get();
@@ -161,7 +161,10 @@ export class Updater {
       return this.get();
     }
     // The file electron-updater will fetch for this computer: Windows the Setup .exe, a Mac the zip of its own chip.
-    const mine = (u: string) => (process.platform === 'win32' ? u.endsWith('.exe') : u.endsWith('.zip') && (process.arch === 'arm64') === u.includes('arm64'));
+    // Linux: the AppImage, or the .deb for a copy installed from one (electron-updater picks the same way).
+    const linux = (u: string) => (process.env.APPIMAGE ? u.endsWith('.AppImage') : u.endsWith('.deb')) && (process.arch === 'arm64') === /arm64|aarch64/.test(u);
+    const mine = (u: string) =>
+      process.platform === 'win32' ? u.endsWith('.exe') : process.platform === 'linux' ? linux(u) : u.endsWith('.zip') && (process.arch === 'arm64') === u.includes('arm64');
     const size = info.files?.find((f) => mine(f.url))?.size;
     this.set({ status: 'available', version: info.version, notes: notesOf(info), size, releaseDate: info.releaseDate, lastChecked, source: this.source });
     if (!manual && stored().skipped !== info.version) this.notify('available');

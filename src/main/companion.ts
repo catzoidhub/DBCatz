@@ -13,12 +13,15 @@ import { join } from 'node:path';
  */
 
 const isWin = process.platform === 'win32';
+/** Linux (TODO §18): AppImages in ~/Applications or a .deb's /opt/<App>, as DevCatz's and DoCatz's companion.ts. */
+const isLinux = process.platform === 'linux';
 
 /** The site's platform id for this computer (mac-arm64, mac-x64, win-x64), or null when no Catzoid build exists for it. */
 export function platformId(): string | null {
   const arch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x64' : null;
   if (process.platform === 'darwin' && arch) return `mac-${arch}`;
   if (isWin && arch === 'x64') return 'win-x64';
+  if (isLinux && arch) return `linux-${arch}`;
   return null;
 }
 
@@ -28,6 +31,8 @@ export function platformLabel(): string {
   if (id === 'mac-arm64') return 'Mac (Apple silicon)';
   if (id === 'mac-x64') return 'Mac (Intel)';
   if (id === 'win-x64') return 'Windows';
+  if (id === 'linux-arm64') return 'Linux (ARM64)';
+  if (id === 'linux-x64') return 'Linux (x64)';
   return `${process.platform} ${process.arch}`;
 }
 
@@ -36,12 +41,17 @@ export function platformAsset(name: string): { pattern: RegExp; label: string } 
   const id = platformId();
   if (!id) return null;
   if (id === 'win-x64') return { pattern: new RegExp(`^${name}-Setup-.*\\.exe$`), label: 'Windows' };
+  if (id.startsWith('linux-')) return { pattern: new RegExp(`^${name}-.*-${id.slice(6)}\\.AppImage$`), label: platformLabel() };
   const arch = id === 'mac-arm64' ? 'arm64' : 'x64';
   return { pattern: new RegExp(`^${name}-.*-${arch}\\.dmg$`), label: platformLabel() };
 }
 
-/** Where a Catzoid app is installed by default: /Applications on a Mac, the per-user NSIS folder on Windows. */
+/**
+ * Where a Catzoid app is installed by default: /Applications on a Mac, the per-user NSIS folder on Windows; on Linux
+ * the AppImage in ~/Applications (where the apps install themselves and each other), or a .deb's /opt/<App>.
+ */
 export function catzoidAppPaths(name: string): string[] {
+  if (isLinux) return [join(homedir(), 'Applications', `${name}.AppImage`), `/opt/${name}/${name.toLowerCase()}`, `/opt/${name}/${name}`];
   if (isWin) {
     const local = process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local');
     return [join(local, 'Programs', name, `${name}.exe`), join(process.env.ProgramFiles ?? 'C:\\Program Files', name, `${name}.exe`)];
@@ -58,6 +68,7 @@ export async function findCatzoidApp(name: string, scheme: string, bundleId: str
     !!p && (isWin ? /\.exe$/i.test(p) && existsSync(p) : !p.includes('/.Trash/') && existsSync(join(p, 'Contents', 'Info.plist')));
   const known = catzoidAppPaths(name).find((p) => existsSync(p));
   if (known) return known;
+  if (isLinux) return null;
   const handler = await app.getApplicationInfoForProtocol(`${scheme}://open`).catch(() => null);
   if (usable(handler?.path) && new RegExp(name, 'i').test(handler.path)) return handler.path;
   if (isWin) return null;
@@ -65,9 +76,9 @@ export async function findCatzoidApp(name: string, scheme: string, bundleId: str
   return out.split('\n').map((l) => l.trim()).find(usable) ?? null;
 }
 
-/** Opens a Catzoid app at a link: `open -a` on a Mac (that very copy), the .exe with the link on Windows. */
+/** Opens a Catzoid app at a link: `open -a` on a Mac (that very copy), the program with the link on Windows / Linux. */
 export async function openCatzoidApp(path: string, link: string): Promise<void> {
-  if (isWin) {
+  if (isWin || isLinux) {
     const ok = await new Promise<boolean>((resolve) => {
       const child = spawn(path, [link], { detached: true, stdio: 'ignore' });
       child.once('error', () => resolve(false));

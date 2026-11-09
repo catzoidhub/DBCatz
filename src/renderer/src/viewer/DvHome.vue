@@ -340,7 +340,7 @@ const support = computed(() => dvOptionSupport(form.value.engine, form.value.met
 const sqlTz = computed(() => form.value.engine === 'mysql' || form.value.engine === 'mariadb' || form.value.engine === 'postgresql');
 const m = computed(() => form.value.method);
 watch(m, (v) => {
-  if (v === 'socket' && !form.value.socket) form.value.socket = currentOS === 'windows' ? '\\\\.\\pipe\\MySQL' : form.value.engine === 'postgresql' ? '/tmp' : form.value.engine === 'mysql' || form.value.engine === 'mariadb' ? '/tmp/mysql.sock' : form.value.engine === 'mongodb' ? `/tmp/mongodb-${form.value.port}.sock` : '/tmp/redis.sock';
+  if (v === 'socket' && !form.value.socket) form.value.socket = currentOS === 'windows' ? '\\\\.\\pipe\\MySQL' : form.value.engine === 'postgresql' ? (currentOS === 'linux' ? '/var/run/postgresql' : '/tmp') : form.value.engine === 'mysql' || form.value.engine === 'mariadb' ? (currentOS === 'linux' ? '/var/run/mysqld/mysqld.sock' : '/tmp/mysql.sock') : form.value.engine === 'mongodb' ? `/tmp/mongodb-${form.value.port}.sock` : '/tmp/redis.sock';
   if (v === 'ssh' && (!form.value.host || form.value.host === 'localhost')) form.value.host = '127.0.0.1';
   if (v === 'aws-iam') form.value.options.requireSsl = true;
   testToken.value = '';
