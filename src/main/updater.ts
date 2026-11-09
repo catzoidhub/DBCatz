@@ -114,7 +114,10 @@ export class Updater {
     const s = stored();
     autoUpdater.allowPrerelease = channel === 'beta';
     autoUpdater.channel = channel === 'beta' ? 'beta' : 'latest';
-    autoUpdater.requestHeaders = { 'X-Catzoid-Install': s.installId, 'X-Catzoid-Version': app.getVersion(), 'X-Catzoid-Channel': channel };
+    // The install id / version / channel go to catzoid.com's update check only, never to GitHub: none on the GitHub
+    // fallback feed (Catzoid #90).
+    autoUpdater.requestHeaders =
+      source === 'site' ? { 'X-Catzoid-Install': s.installId, 'X-Catzoid-Version': app.getVersion(), 'X-Catzoid-Channel': channel } : null;
     // DBCATZ_UPDATE_FEED: a local feed for tests.
     if (source === 'site') autoUpdater.setFeedURL({ provider: 'generic', url: process.env.DBCATZ_UPDATE_FEED || `${siteBase()}/updates/dbcatz` });
     else autoUpdater.setFeedURL({ provider: 'github', owner: 'catzoidhub', repo: 'DBCatz' });
@@ -169,6 +172,10 @@ export class Updater {
     if (this.state.status !== 'available' && this.state.status !== 'error') return;
     this.token = new CancellationToken();
     this.set({ status: 'downloading', progress: { percent: 0, transferred: 0, total: this.state.size ?? 0, bytesPerSecond: 0 }, error: undefined });
+    // The check (the .yml request) has already counted this install. The download goes through
+    // catzoid.com/updates/dbcatz/<file>, which redirects to GitHub's release assets, and electron-updater keeps these
+    // headers across that redirect: none on the download (Catzoid #90). The next check sets them again.
+    autoUpdater.requestHeaders = null;
     try {
       await autoUpdater.downloadUpdate(this.token);
     } catch (e) {
