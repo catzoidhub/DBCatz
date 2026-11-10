@@ -62,7 +62,14 @@ export function dispatch(c: Command): void {
 
 export async function refreshConnections(): Promise<void> {
   connections.value = await api.dvConnections();
-  for (const t of tabs.value) if (t.connection) t.connection = connections.value.find((c) => c.id === t.connection!.id) ?? t.connection;
+  for (const t of [...tabs.value]) {
+    if (!t.connection) continue;
+    const now = connections.value.find((c) => c.id === t.connection!.id);
+    // A connection removed (on the Connections page, by MCatzP, a DevCatz / DoCatz service gone): its tabs close
+    // rather than keep working on a connection that no longer exists.
+    if (now) t.connection = now;
+    else closeTab(t.id);
+  }
 }
 
 /** Opens the tab of a connection (focuses an existing one unless `fresh`), optionally at a database / table. */
