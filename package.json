@@ -2,7 +2,7 @@
   "name": "dbcatz",
   "productName": "DBCatz",
   "desktopName": "dbcatz.desktop",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "license": "GPL-3.0-only",
   "private": true,
   "description": "DBCatz — a database viewer for MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch on macOS, Windows and Linux; a tab per connection, local, over SSH, AWS IAM or Vault. Lists DevCatz's services when DevCatz is installed.",
