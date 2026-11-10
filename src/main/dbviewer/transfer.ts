@@ -65,7 +65,7 @@ export async function dumpSql(d: Driver, db: string, tables: string[], out: Writ
   const e = d.engine;
   const all = await d.tables(db);
   const list = tables.length ? all.filter((t) => tables.includes(t.name)) : all;
-  await write(out, `-- DevCatz DBCatz export\n-- Engine: ${e}  Database: ${db}  ${new Date().toISOString()}\n\n`);
+  await write(out, `-- DBCatz export\n-- Engine: ${e}  Database: ${db}  ${new Date().toISOString()}\n\n`);
   if (e === 'mysql' || e === 'mariadb') await write(out, 'SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS = 0;\n\n');
   if (e === 'sqlite') await write(out, 'PRAGMA foreign_keys = OFF;\nBEGIN TRANSACTION;\n\n');
   let i = 0;
@@ -104,7 +104,7 @@ export async function exportTo(d: Driver, path: string, o: DvExportOptions, prog
     }
     if (o.format === 'redis') {
       if (!d.keys || !d.key) throw new Error('A redis script is for Redis / Valkey');
-      await write(out, `# DevCatz DBCatz export · ${db}\nSELECT ${db.replace(/^db/, '')}\n`);
+      await write(out, `# DBCatz export · ${db}\nSELECT ${db.replace(/^db/, '')}\n`);
       const { keys } = await d.keys(db, o.tables[0] || '*', 1_000_000);
       let n = 0;
       for (const k of keys) {

@@ -29,8 +29,9 @@ import { words } from '@shared/platform';
  * The shared AI keys are the Catzoid\keys\<provider>.dpapi files.
  *
  * Linux (TODO §18, as DevCatz and DoCatz): ~/.config/DBCatz, its caches, update downloads and the AppImage's menu entry
- * go after it quits; the app is the AppImage (deleted) or the .deb (`dpkg -r` behind the password prompt, while DBCatz
- * still runs). The shared AI keys are Secret Service items (shared.ts).
+ * go after it quits, with DBCatz's dbcatz:// line in mimeapps.list; the app is the AppImage (deleted) or the .deb
+ * (`dpkg --purge` behind the password prompt, while DBCatz still runs). The shared AI keys are Secret Service items
+ * (shared.ts).
  */
 
 const BUNDLE_ID = 'com.mrcatz.dbcatz';
@@ -174,13 +175,20 @@ export async function uninstallRun(confirm: string, shared: boolean, beforeQuit:
     if (withShared) for (const p of readShared().ai?.keys ?? []) await setSharedKey(p as DvAiProvider, '').catch(() => undefined);
     // The .deb's files are root's: dpkg removes them (and the menu entry) behind the password prompt; a running program
     // keeps its open files, so DBCatz still finishes and quits.
+    // --purge, not -r: -r left the package in dpkg's list as "rc" (removed, configuration kept) though DBCatz has none.
     const pkg = await linuxPackage();
     if (pkg) {
-      const r = await runAsRootLinux(`dpkg -r ${shq(pkg)} >/dev/null`);
-      if (!r.ok) console.warn('uninstall: dpkg -r:', r.message);
+      const r = await runAsRootLinux(`dpkg --purge ${shq(pkg)} >/dev/null`);
+      if (!r.ok) console.warn('uninstall: dpkg --purge:', r.message);
     }
     const out = ['#!/bin/sh', `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.2; done`];
     for (const f of plan.items) if (!f.path.startsWith('/opt/')) out.push(`rm -rf ${q(f.path)}`);
+    // The dbcatz:// default xdg-mime wrote (the AppImage's menu entry, or a click on a link) stays in mimeapps.list after
+    // the entry is gone (VM, 2026-11-10): only DBCatz's own line goes, the rest of the file is the user's.
+    const config = process.env.XDG_CONFIG_HOME || join(home, '.config');
+    const dataHome = process.env.XDG_DATA_HOME || join(home, '.local', 'share');
+    for (const list of [join(config, 'mimeapps.list'), join(dataHome, 'applications', 'mimeapps.list')])
+      if (existsSync(list)) out.push(`sed -i '/^x-scheme-handler\\/dbcatz=.*dbcatz\\.desktop/d' ${q(list)} 2>/dev/null`);
     if (withShared) out.push(`rm -f ${q(join(SHARED_DIR, 'shared.json'))}`, `rmdir ${q(SHARED_DIR)} 2>/dev/null`);
     out.push('rm -f "$0"');
     const script = join(tmpdir(), `dbcatz-uninstall-${process.pid}.sh`);
