@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain, shell } from 'electron';
+import { app, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,6 +18,7 @@ import { Mcatzp } from './mcatzp';
 import * as mcatzpSetup from './mcatzp/install';
 import { MCATZP_TARGETS } from '@catzoid/mcatzp-host';
 import { offerAppImageInstall } from './appimage';
+import { openDialog, saveDialog } from './dialogs';
 
 /**
  * DBCatz — a database viewer for MySQL / MariaDB, PostgreSQL, SQLite, Redis /
@@ -280,7 +281,7 @@ function api(): DbCatzApi {
       else if (/^https?:\/\//i.test(url)) await shell.openExternal(url);
     },
     pickFile: async (title) => {
-      const r = await dialog.showOpenDialog(win()!, { title, properties: ['openFile', 'showHiddenFiles'] });
+      const r = await openDialog({ title, properties: ['openFile', 'showHiddenFiles'] });
       return r.canceled ? null : r.filePaths[0];
     },
     openInDevCatz: async (serviceId) => {
@@ -301,26 +302,26 @@ function api(): DbCatzApi {
     ...viewer.routes(),
     dvOpen: async (connId, database) => openViewer(connId, database),
     dvPickSqlite: async () => {
-      const r = await dialog.showOpenDialog(win()!, { title: 'SQLite database file or folder', properties: ['openFile', 'openDirectory'], filters: [{ name: 'SQLite', extensions: ['sqlite', 'sqlite3', 'db', 'db3', 's3db'] }] });
+      const r = await openDialog({ title: 'SQLite database file or folder', properties: ['openFile', 'openDirectory'], filters: [{ name: 'SQLite', extensions: ['sqlite', 'sqlite3', 'db', 'db3', 's3db'] }] });
       return r.canceled ? null : r.filePaths[0];
     },
     dvExport: async (connId, options) => {
       const ext = options.format === 'redis' ? 'redis' : options.format === 'json' ? 'ndjson' : options.format;
       const name = `${options.database}${options.tables.length === 1 ? `-${options.tables[0]}` : ''}.${ext}`;
-      const r = await dialog.showSaveDialog(win()!, { defaultPath: join(app.getPath('downloads'), name), filters: [{ name: options.format.toUpperCase(), extensions: [ext] }] });
+      const r = await saveDialog({ defaultPath: join(app.getPath('downloads'), name), filters: [{ name: options.format.toUpperCase(), extensions: [ext] }] });
       if (r.canceled || !r.filePath) return null;
       return background(viewer.export(connId, r.filePath, options), r.filePath);
     },
     dvImport: async (connId, options) => {
       const filters = options.format === 'sql' ? [{ name: 'SQL or DBCatz backup', extensions: ['sql', 'gz', 'tgz'] }] : options.format === 'csv' ? [{ name: 'CSV', extensions: ['csv', 'txt'] }] : options.format === 'json' ? [{ name: 'JSON / NDJSON', extensions: ['json', 'ndjson', 'jsonl'] }] : [{ name: 'Redis script or DBCatz backup', extensions: ['redis', 'txt', 'gz', 'tgz'] }];
-      const r = await dialog.showOpenDialog(win()!, { title: 'Import', properties: ['openFile'], filters });
+      const r = await openDialog({ title: 'Import', properties: ['openFile'], filters });
       if (r.canceled || !r.filePaths[0]) return null;
       return background(viewer.import(connId, r.filePaths[0], options), r.filePaths[0]);
     },
     dvBackup: async (connId, databases) => {
       const stamp = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
       const conn = viewer.connections().find((c) => c.id === connId);
-      const r = await dialog.showSaveDialog(win()!, { defaultPath: join(app.getPath('downloads'), `${(conn?.name ?? 'database').replace(/[^\w.-]+/g, '-')}-${stamp}.tar.gz`), filters: [{ name: 'Gzipped tar', extensions: ['tar.gz', 'gz'] }] });
+      const r = await saveDialog({ defaultPath: join(app.getPath('downloads'), `${(conn?.name ?? 'database').replace(/[^\w.-]+/g, '-')}-${stamp}.tar.gz`), filters: [{ name: 'Gzipped tar', extensions: ['tar.gz', 'gz'] }] });
       if (r.canceled || !r.filePath) return null;
       return background(viewer.backup(connId, r.filePath, databases), r.filePath);
     },
