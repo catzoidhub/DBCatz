@@ -189,6 +189,10 @@ export async function uninstallRun(confirm: string, shared: boolean, beforeQuit:
     const dataHome = process.env.XDG_DATA_HOME || join(home, '.local', 'share');
     for (const list of [join(config, 'mimeapps.list'), join(dataHome, 'applications', 'mimeapps.list')])
       if (existsSync(list)) out.push(`sed -i '/^x-scheme-handler\\/dbcatz=.*dbcatz\\.desktop/d' ${q(list)} 2>/dev/null`);
+    // The AppImage's entry went into mimeinfo.cache (update-desktop-database, appimage.ts): rebuilt without it, or
+    // xdg-mime still names dbcatz.desktop for dbcatz:// after the uninstall (VM, 2026-11-10).
+    const apps = join(dataHome, 'applications');
+    if (existsSync(join(apps, 'mimeinfo.cache'))) out.push(`update-desktop-database ${q(apps)} 2>/dev/null`);
     if (withShared) out.push(`rm -f ${q(join(SHARED_DIR, 'shared.json'))}`, `rmdir ${q(SHARED_DIR)} 2>/dev/null`);
     out.push('rm -f "$0"');
     const script = join(tmpdir(), `dbcatz-uninstall-${process.pid}.sh`);
