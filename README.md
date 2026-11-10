@@ -9,14 +9,14 @@
   <a href="https://catzoid.com/community">Community</a>
 </p>
 
-A database client for macOS and Windows: MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch in one window, a tab per connection — local servers, through SSH, on AWS with IAM, or with credentials from Vault. Production mode asks before every write, read-only stays read-only, and an optional AI writes the query while you press Run.
+A database client for macOS, Windows and Linux: MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch in one window, a tab per connection — local servers, through SSH, on AWS with IAM, or with credentials from Vault. Production mode asks before every write, read-only stays read-only, and an optional AI writes the query while you press Run.
 
 Part of [Catzoid](https://catzoid.com) — free, open-source developer tools with nine lives. All cats, no catch: no
 account, no Pro tier, nothing locked behind a payment.
 
 ## What it does
 
-- **Connect** by hand, over SSH, with AWS IAM or Vault — or paste a URL (`postgres://…`, a whole `DATABASE_URL=` line works too). Passwords stay in the macOS Keychain, or on Windows encrypted for your account.
+- **Connect** by hand, over SSH, with AWS IAM or Vault — or paste a URL (`postgres://…`, a whole `DATABASE_URL=` line works too). Passwords stay in the macOS Keychain, encrypted for your account on Windows, and on Linux encrypted with a key your desktop keyring keeps.
 - **Browse and edit** — data grid with filters, structure, indexes, export and import, a query editor with history.
 - **Production safety** — Production and Read-only modes per connection, typed confirmations for risky statements.
 - **AI, optional** — Ask in plain words; only structure is sent, never your rows unless you allow samples.
@@ -39,6 +39,10 @@ Windows 10 / 11 (x64): `DBCatz-Setup-<version>.exe` from the same page or the
 [latest release](https://github.com/catzoidhub/DBCatz/releases/latest). It installs for your account only, no
 administrator rights needed. It is not code-signed yet (see Code signing below).
 
+Linux (x64): `DBCatz-<version>-x64.AppImage` or `DBCatz-<version>-amd64.deb` from the same page or the
+[latest release](https://github.com/catzoidhub/DBCatz/releases/latest). The AppImage offers to install itself into
+`~/Applications` with a menu entry on its first run; the `.deb` suits Ubuntu and Debian. Neither is signed yet.
+
 ## Build from source
 
 ```bash
@@ -56,7 +60,7 @@ macOS builds are signed with a Developer ID and notarized by Apple. **The Window
 the SignPath Foundation, which signs open-source projects for free, asks for a project with more history and public
 use than DBCatz has today, and paid certificates are out of reach for now. Windows SmartScreen therefore warns when you
 open the installer: choose **More info → Run anyway**. The installer is built by GitHub Actions from this repository,
-so what you run is this source. Stars, issues and pull requests help DBCatz qualify for free signing later. Policy:
+so what you run is this source. Linux packages are built by GitHub Actions from this repository too, and are not signed either. Stars, issues and pull requests help DBCatz qualify for free signing later. Policy:
 [catzoid.com/legal/code-signing](https://catzoid.com/legal/code-signing).
 
 ## How it is made
