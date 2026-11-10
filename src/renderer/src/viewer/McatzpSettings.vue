@@ -71,6 +71,7 @@ async function uninstallMcatzp() {
 async function installMcatzp() {
   const next = await attempt(() => api.mcatzpInstall());
   if (next) setup.value = next;
+  if (next?.movedAside) notify('info', `MCatzP ${next.version ?? ''} is installed. AI assistants that were already running keep the old copy until you restart them.`);
   void loadTargets();
 }
 const targets = ref<McatzpTarget[]>([]);
