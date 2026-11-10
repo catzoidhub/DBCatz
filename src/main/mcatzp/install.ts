@@ -39,20 +39,20 @@ export const removeFromClient = async (id: McatzpTargetId): Promise<void> => rem
 
 /**
  * Uninstall MCatzP (user, 2026-11-10; every Catzoid app the same): the host's uninstall (MCatzP 1.0.3) takes the entries
- * that run the copy in use out of their clients and removes the shared copy; a Homebrew / npm copy is kept and named,
- * with the command that removes it. Client names instead of ids, for the window.
+ * that run the copy in use out of their clients and removes the shared copy; a Homebrew / npm / bun copy is kept, and
+ * MCatzP 1.0.4 names the command that removes it (removeCommand); on Windows a copy an assistant still runs is moved
+ * aside (movedAside). Client names instead of ids, for the window.
  */
 export async function uninstall(): Promise<McatzpUninstallResult> {
   const o = await options();
-  const before = await state(o, false);
   const labels = new Map((await list(o)).map((t) => [t.id, t.label]));
   const r = await removeAll(o);
-  const how = r.binary !== 'kept' ? null : before.source === 'homebrew' ? 'brew uninstall mcatzp' : /node_modules|[\\/]npm[\\/]/.test(r.keptPath ?? '') ? 'npm uninstall -g mcatzp' : null;
   return {
     removedFrom: r.removedFrom.map((id) => labels.get(id) ?? id),
     failed: r.failed.map((f) => ({ client: labels.get(f.id) ?? f.id, error: f.error })),
     binary: r.binary,
     keptPath: r.keptPath,
-    keptHow: how,
+    removeCommand: r.removeCommand,
+    movedAside: r.movedAside,
   };
 }

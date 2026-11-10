@@ -48,13 +48,16 @@ export interface DbCatzSettings {
 }
 
 /** Settings → MCatzP: the local channel an AI client reaches DBCatz through. DBCatz's own, per computer. */
-/** Uninstall MCatzP's result (the host's, with client names): `keptHow` is the command for a Homebrew / npm copy. */
+/** Uninstall MCatzP's result (the host's, MCatzP 1.0.4, with client names instead of ids). */
 export interface McatzpUninstallResult {
   removedFrom: string[];
   failed: { client: string; error: string }[];
   binary: 'removed' | 'kept' | 'none';
   keptPath: string | null;
-  keptHow: string | null;
+  /** brew / npm / bun command for a kept copy; null when not known. */
+  removeCommand: string | null;
+  /** Windows: the copy was running, so it was moved into the temp folder (swept by the next install or uninstall). */
+  movedAside: string | null;
 }
 
 export interface DvMcatzpSettings {
