@@ -201,8 +201,10 @@ export class RedisDriver implements Driver {
 
   async version() {
     const info = String(await this.c.command('INFO', 'server'));
-    const v = /(?:valkey|redis)_version:(\S+)/.exec(info)?.[1] ?? '?';
-    return `${/valkey_version/.test(info) ? 'Valkey' : 'Redis'} ${v}`;
+    // Valkey also reports redis_version (7.2.4, the Redis it is compatible with), before its own valkey_version.
+    const valkey = /valkey_version:(\S+)/.exec(info)?.[1];
+    if (valkey) return `Valkey ${valkey}`;
+    return `Redis ${/redis_version:(\S+)/.exec(info)?.[1] ?? '?'}`;
   }
 
   /** db0 … dbN with their key counts (`databases` config, 16 by default). */
