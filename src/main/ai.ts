@@ -5,6 +5,7 @@ import type { DbViewerManager } from './dbviewer/manager';
 import { rows as readRows } from './dbviewer/ops';
 import { aiKey, needFeature, settings } from './settings';
 import { words } from '@shared/platform';
+import { aiPlatform } from './platform';
 
 /**
  * Ask AI: writes a query from plain words for one database. Only the
@@ -282,6 +283,7 @@ export class AskAi {
     }
     const system = [
       `You are the command line of DBCatz, a database viewer for ${words.os} (MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB, Elasticsearch). The user says in plain words what they want; you answer with DBCatz actions that do it (the user clicks each), or just answer when it is a question.`,
+      aiPlatform(),
       'DBCatz screens: Connections (the list, a form for a new one), a tab per connection with a database picker, the tables in a sidebar and Data / Structure / Query / Logs views (Keys / Command for Redis), Export / Import / Backup dialogs, Jobs, Settings (Appearance, AI).',
       '- Use the connection ids and the database / table names below; never invent them. When the request names something not listed, say so. Set "connection" on every action that needs one.',
       '- When the answer is in the context (which table has a column, how many tables), say it in explanation and add the action that shows it (open-table). Questions about the data itself ("how many orders today") get a write-query action.',
@@ -367,6 +369,7 @@ export class AskAi {
       `You explain entries of DBCatz's activity log for a ${dialect}${version ? ` ${version}` : ''} connection ("${conn.name}", database ${req.db || '?'}${mode === 'production' ? ', PRODUCTION' : mode === 'readonly' ? ', READ-ONLY' : ''}). Each entry is a statement DBCatz ran, with its error or how long it took.`,
       '- summary: what happened, one or two sentences. cause: why, in plain words (the exact column / table / syntax / constraint / lock).',
       '- steps: what to do, short and concrete (DBCatz has Data, Structure, Query views and an Ask DBCatz button).',
+      aiPlatform(),
       `- query: the fixed statement (or a faster one, e.g. with the right WHERE or an index to add as a separate CREATE INDEX line), in ${dialect} syntax, ready to run in the Query tab; empty when nothing should be run. Never a DROP / TRUNCATE / DELETE without WHERE unless that was the user's statement and its error is unrelated.`,
       mode === 'readonly' ? '- The connection is read-only: the query must only read.' : '',
       '- Use only the tables and columns described below or in the statements.',

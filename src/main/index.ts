@@ -1,6 +1,6 @@
 import { app, ipcMain, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { systemVersion } from './platform';
 import { join } from 'node:path';
 import { API_METHODS, type DbCatzApi } from '@shared/types';
 import { DbViewerManager } from './dbviewer/manager';
@@ -136,18 +136,6 @@ app.on('before-quit', () => {
   mcatzp?.quit();
   void viewer.closeAll();
 });
-
-/** The OS version for About: on Linux the distribution (/etc/os-release, e.g. "Ubuntu 24.04.3 LTS"), not the kernel. */
-function systemVersion(): string {
-  if (process.platform !== 'linux') return process.getSystemVersion();
-  try {
-    const name = /^PRETTY_NAME="?([^"\n]+)"?/m.exec(readFileSync('/etc/os-release', 'utf8'))?.[1];
-    if (name) return `${name} (kernel ${process.getSystemVersion()})`;
-  } catch {
-    /* no os-release */
-  }
-  return process.getSystemVersion();
-}
 
 /** A started job runs on; its end (and any error) reaches the window through the Jobs list. */
 function background(job: Promise<string>, path: string): string {
