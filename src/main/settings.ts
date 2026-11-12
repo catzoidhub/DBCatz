@@ -38,7 +38,15 @@ function local(): Stored {
     theme: THEMES.includes(s.theme as Theme) ? (s.theme as Theme) : 'system',
     ai: { enabled: ai.enabled === true, provider: PROVIDERS.includes(ai.provider) ? ai.provider : 'anthropic', models: ai.models ?? {}, baseUrls: ai.baseUrls ?? {}, samples: Array.isArray(ai.samples) ? ai.samples.map(String) : [], off: Array.isArray(ai.off) ? ai.off.filter((f): f is DvAiFeature => FEATURES.includes(f)) : [] },
     mcatzp: mcatzpOf(s.mcatzp),
+    ...supportOf(s),
   };
+}
+
+const time = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined);
+/** Support Catzoid's corner card (Catzoid #94): only numbers and a switch, dropped when unset. */
+function supportOf(s: Partial<Stored>): Pick<Stored, 'supportSince' | 'supportLater' | 'supportLaterAt' | 'supportOff'> {
+  const later = typeof s.supportLater === 'number' && s.supportLater >= 0 ? Math.min(Math.floor(s.supportLater), 9) : undefined;
+  return { supportSince: time(s.supportSince), supportLater: later, supportLaterAt: time(s.supportLaterAt), supportOff: s.supportOff === true ? true : undefined };
 }
 
 /** The shared values win where they are set. */
@@ -50,6 +58,7 @@ function stored(): Stored {
     theme: sh.theme && THEMES.includes(sh.theme) ? sh.theme : s.theme,
     ai: { enabled: s.ai.enabled, provider: PROVIDERS.includes(provider) ? provider : 'anthropic', models: sh.ai?.models ?? s.ai.models, baseUrls: sh.ai?.baseUrls ?? s.ai.baseUrls, samples: s.ai.samples, off: s.ai.off },
     mcatzp: s.mcatzp,
+    ...supportOf(s),
   };
 }
 
@@ -102,12 +111,22 @@ export function setSettings(patch: DbCatzSettingsPatch): DbCatzSettings {
     if (m.changes !== undefined) s.mcatzp.changes = m.changes === true;
     if (m.connections !== undefined) s.mcatzp.connections = ids(m.connections);
   }
+  const sup = supportOf({ ...s, ...(patch.supportLater !== undefined ? { supportLater: patch.supportLater } : {}), ...(patch.supportLaterAt !== undefined ? { supportLaterAt: patch.supportLaterAt } : {}), ...(patch.supportOff !== undefined ? { supportOff: patch.supportOff } : {}) });
+  Object.assign(s, sup);
   store.setExtra(KEY, s);
   // The theme and the connection are shared with DevCatz; Ask AI on / off is not.
   const conn = ai && (ai.provider !== undefined || ai.models !== undefined || ai.baseUrls !== undefined);
   if (patch.theme !== undefined || conn) writeShared({ ...(patch.theme !== undefined ? { theme: s.theme } : {}), ...(conn ? { ai: { provider: s.ai.provider, models: s.ai.models, baseUrls: s.ai.baseUrls } } : {}) });
   nativeTheme.themeSource = s.theme;
   return settings();
+}
+
+/** Support Catzoid (Catzoid #94): the corner card counts its 7 days from the first run that knows about it. */
+export function startSupportClock(): void {
+  const s = stored();
+  if (s.supportSince) return;
+  s.supportSince = Date.now();
+  store.setExtra(KEY, s);
 }
 
 /** Approved MCatzP clients: only the main process changes them (a pairing answered, Revoke). */

@@ -7,7 +7,7 @@ import { DbViewerManager } from './dbviewer/manager';
 import { applyMenu, appMenuPopup, menuKey, menuShortcuts, openViewer, setUpdateLabel, showViewer, tableMenu, viewerWindow } from './dbviewer/window';
 import { AppServices } from './devcatz';
 import { AskAi } from './ai';
-import { applySettings, migrateToShared, setAiKey, setSettings, settings } from './settings';
+import { applySettings, migrateToShared, setAiKey, setSettings, settings, startSupportClock } from './settings';
 import { siteBase } from './shared';
 import { Updater } from './updater';
 import { Reporter } from './reporter';
@@ -328,6 +328,7 @@ app.whenReady().then(async () => {
   const restarting = await offerAppImageInstall(app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'));
   offeringInstall = false;
   if (restarting) return;
+  startSupportClock();
   if (app.isPackaged) app.setAsDefaultProtocolClient('dbcatz'); // not the dev Electron binary
   const impl = api() as unknown as Record<string, (...args: unknown[]) => unknown>;
   // Saving or removing a connection rewrites bridge.json (DialCatz reads it).

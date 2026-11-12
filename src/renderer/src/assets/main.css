@@ -2252,6 +2252,15 @@ html.is-win .dv-top-btn {
   margin-bottom: 0;
 }
 
+/* Support Catzoid (#94) next to Settings: muted, the heart takes the primary colour on hover. */
+.support-heart {
+  color: oklch(from var(--color-base-content) l c h / 0.45);
+  transition: color 0.15s, background 0.15s;
+}
+.support-heart:hover {
+  color: var(--primary-ink, var(--color-primary));
+}
+
 /* MCatzP has an update: its own colours, the ones of its arrow in the pairing dialog. */
 .mcatzp-pill {
   display: inline-block;

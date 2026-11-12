@@ -11,6 +11,7 @@ import DvReplyViewer from './DvReplyViewer.vue';
 import { structured } from './pretty';
 import type { Language } from './highlight';
 import { esComplete, mongoComplete, redisComplete, sqlComplete } from './complete';
+import { querySucceeded } from '../support';
 import { askWrite, fmtMs, fmtNum, formatSql, history, historyKey, isKv, isProd, isReadOnly, isSql, logActivity, remember, words } from './viewer';
 import { statementKind } from '@shared/dbsafety';
 import { splitStatements as splitSqlStatements } from '@shared/sqlsplit';
@@ -297,6 +298,7 @@ async function execute(text: string) {
   remember(props.conn.id, props.db, text);
   for (const x of r) logActivity(props.conn.id, { text: `[${props.db}] ${x.statement}`, ms: x.ms, affected: x.affected ?? (x.columns.length ? x.rows.length : null), error: x.error });
   const failed = r.find((x) => x.error);
+  if (!failed) querySucceeded.value = true; // Support Catzoid's success moment (Catzoid #94)
   if (failed) notify('error', failed.error!);
   else if (r.some((x) => x.affected !== null)) {
     notify('success', `${r.reduce((n, x) => n + (x.affected ?? 0), 0)} ${W.rows} affected`);

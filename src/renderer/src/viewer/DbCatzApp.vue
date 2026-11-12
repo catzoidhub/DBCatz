@@ -16,6 +16,8 @@ import DvReportDialog from './DvReportDialog.vue';
 import CopyName from '../components/CopyName.vue';
 import McatzpPairDialog from './McatzpPairDialog.vue';
 import DvWelcome from './DvWelcome.vue';
+import SupportNudge from './SupportNudge.vue';
+import CatHeart from '../components/CatHeart.vue';
 import askMark from '../assets/logos/ask-catzoid.svg';
 import { back, changed, forward, goTo } from './nav';
 
@@ -151,6 +153,12 @@ async function openAt(c: DvConnection, db: string | undefined, table: string, co
 
 // ---- Ask DBCatz: the ✦ button bottom-right (⌘K), when AI and the Ask DBCatz feature are on
 const askOpen = ref(false);
+/** Support Catzoid (Catzoid #94): the heart in the top bar → Settings → About, scrolled to its card. */
+function openSupport() {
+  settingsTab.value = 'about';
+  showSettings.value = true;
+  setTimeout(() => document.getElementById('support-catzoid')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+}
 const askOn = aiOn('ask');
 
 /** Edit → Select All (⌘A): text fields select their text; otherwise the front workspace (its table list). */
@@ -240,6 +248,10 @@ function menuAct(fn: (id: string) => void) {
         <svg v-else viewBox="0 0 20 20" class="size-4" fill="currentColor"><path d="M10 3a1 1 0 0 1 1 1v6.6l2.3-2.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L9 10.6V4a1 1 0 0 1 1-1ZM4 14a1 1 0 0 1 1 1v1h10v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z" /></svg>
         Jobs<span v-if="jobs.length" class="badge badge-ghost badge-xs">{{ jobs.length }}</span>
       </button>
+      <!-- Support Catzoid (Catzoid #94): small and quiet, always there; no badge, no animation. -->
+      <button class="dv-top-btn support-heart no-drag btn btn-ghost btn-xs btn-square mb-1.5" title="Support Catzoid" @click="openSupport">
+        <CatHeart class="size-4 -translate-y-px" />
+      </button>
       <button class="dv-top-btn no-drag btn btn-ghost btn-xs btn-square relative mb-1.5" :class="{ 'btn-active': showSettings }" :title="`Settings (${keyLabel('mod+,')})`" @click="showSettings = !showSettings">
         <span v-if="update?.status === 'available' || update?.status === 'downloaded'" class="absolute top-0.5 right-0.5 size-2 rounded-full bg-primary ring-2 ring-base-100" title="An update is ready" />
         <span v-else-if="mcatzpUpdate" class="mcatzp-dot absolute top-0.5 right-0.5 ring-2 ring-base-100" :title="`MCatzP ${mcatzpUpdate} is available`" />
@@ -262,6 +274,7 @@ function menuAct(fn: (id: string) => void) {
     <DvReportDialog v-if="ready && reportOpen" :kind="reportOpen" @close="reportOpen = null" />
     <McatzpPairDialog />
     <DvWelcome v-if="ready" />
+    <SupportNudge v-if="ready" />
 
     <!-- Asked once, after the first error: send crash reports? (Catzoid #65) -->
     <dialog v-if="reportsAsk" open class="modal modal-open">

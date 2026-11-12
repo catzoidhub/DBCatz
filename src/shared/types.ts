@@ -45,6 +45,15 @@ export interface DbCatzSettings {
   theme: Theme;
   ai: DvAiSettings;
   mcatzp: DvMcatzpSettings;
+  /**
+   * Support Catzoid (Catzoid #94): when this DBCatz first ran with the feature (the corner card waits 7 days after
+   * it), how many times the card was put off with Not now, when that last was, and whether it is off for good
+   * (Don't show again, or the user already joined / donated from it). Settings → About keeps the links either way.
+   */
+  supportSince?: number;
+  supportLater?: number;
+  supportLaterAt?: number;
+  supportOff?: boolean;
 }
 
 /** Settings → MCatzP: the local channel an AI client reaches DBCatz through. DBCatz's own, per computer. */
@@ -203,7 +212,7 @@ export interface DvLogAnswer {
   /** The fixed (or faster) statement, '' when there is none; opened in the Query tab, never run. */
   query: string;
 }
-export type DbCatzSettingsPatch = { theme?: Theme; ai?: Partial<Omit<DvAiSettings, 'keys'>>; mcatzp?: Partial<Omit<DvMcatzpSettings, 'clients'>> };
+export type DbCatzSettingsPatch = { theme?: Theme; ai?: Partial<Omit<DvAiSettings, 'keys'>>; mcatzp?: Partial<Omit<DvMcatzpSettings, 'clients'>>; supportLater?: number; supportLaterAt?: number; supportOff?: boolean };
 
 /** Progress of a long task shown in the window (a shape DevCatz uses too). */
 export interface TaskProgress {
