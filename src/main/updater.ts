@@ -1,4 +1,4 @@
-import { app, Notification } from 'electron';
+import { app, net, Notification } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { autoUpdater, CancellationToken, type ProgressInfo, type UpdateInfo } from 'electron-updater';
 import type { DvUpdateChannel, DvUpdateSettings, DvUpdateState } from '@shared/types';
@@ -47,7 +47,7 @@ export const installId = () => stored().installId;
 export const updateChannel = (): DvUpdateChannel => stored().channel;
 
 
-/** Release notes from the feed: a string, or one entry per version in between. */
+/** Release notes from the feed (the GitHub fallback has them; the site's latest*.yml does not): a string, or one per version. */
 function notesOf(info: UpdateInfo): string {
   const n = info.releaseNotes;
   if (!n) return '';
@@ -67,7 +67,7 @@ export class Updater {
 
   constructor() {
     const s = stored();
-    this.state = { status: 'idle', current: app.getVersion(), lastChecked: s.lastChecked, settings: this.settings(), downloadUrl: '' };
+    this.state = { status: 'idle', current: app.getVersion(), lastChecked: s.lastChecked, settings: this.settings(), downloadUrl: '', notesUrl: `${siteBase()}/dbcatz/download#versions` };
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.logger = null;
@@ -166,9 +166,70 @@ export class Updater {
     const mine = (u: string) =>
       process.platform === 'win32' ? u.endsWith('.exe') : process.platform === 'linux' ? linux(u) : u.endsWith('.zip') && (process.arch === 'arm64') === u.includes('arm64');
     const size = info.files?.find((f) => mine(f.url))?.size;
-    this.set({ status: 'available', version: info.version, notes: notesOf(info), size, releaseDate: info.releaseDate, lastChecked, source: this.source });
+    this.set({ status: 'available', version: info.version, notes: await this.notesSince(info), size, releaseDate: info.releaseDate, lastChecked, source: this.source });
+    this.lastInfo = info;
+    this.retryNotes();
     if (!manual && stored().skipped !== info.version) this.notify('available');
     return this.get();
+  }
+
+  /**
+   * Release notes of every version after the installed one, from the site's API (`<site>/api/dbcatz/releases`), else
+   * the feed's own (the GitHub fallback only: the site's latest*.yml has none). "Sometimes no notes" (user,
+   * 2026-11-18, all four apps): DBCatz used the feed's notes alone, so What's New was empty whenever the site answered
+   * the check. Three tries; while the new version's notes are missing they are fetched again every 5 minutes (an hour
+   * at most) and when What's New opens — the site's GitHub cache may not have the release yet.
+   */
+  private async notesSince(info: UpdateInfo): Promise<string> {
+    const beta = stored().channel === 'beta';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, attempt * 3000));
+      try {
+        const res = await net.fetch(`${siteBase()}/api/dbcatz/releases`, { signal: AbortSignal.timeout(15_000) });
+        if (!res.ok) continue;
+        const list = (await res.json()) as { version: string; notes?: string | null }[];
+        const out = list
+          .filter((r) => newer(r.version, app.getVersion()) && !newer(r.version, info.version) && (beta || !r.version.includes('-')) && r.notes?.trim())
+          .sort((a, b) => (newer(a.version, b.version) ? -1 : 1));
+        if (out.some((r) => r.version === info.version)) return out.length === 1 ? out[0].notes!.trim() : out.map((r) => `## ${r.version}\n\n${r.notes!.trim()}`).join('\n\n');
+        break; // answered, but without this release yet: the retries below pick it up
+      } catch {
+        /* next try */
+      }
+    }
+    return notesOf(info);
+  }
+
+  private lastInfo: UpdateInfo | null = null;
+  private notesTimer: ReturnType<typeof setInterval> | null = null;
+  private notesMissing = () => !!this.state.version && !this.state.notes?.trim();
+
+  /** Fetches the notes again while they are missing: every 5 minutes for an hour, and when What's New opens. */
+  async refreshNotes(): Promise<DvUpdateState> {
+    const info = this.lastInfo;
+    if (!info || !this.notesMissing() || !['available', 'downloading', 'downloaded'].includes(this.state.status)) {
+      this.stopNotes();
+      return this.get();
+    }
+    const notes = await this.notesSince(info);
+    if (info === this.lastInfo && notes.trim()) this.set({ notes });
+    if (!this.notesMissing()) this.stopNotes();
+    return this.get();
+  }
+
+  private retryNotes(): void {
+    this.stopNotes();
+    if (!this.notesMissing()) return;
+    let left = 12;
+    this.notesTimer = setInterval(() => {
+      if (--left < 0) return this.stopNotes();
+      void this.refreshNotes();
+    }, 5 * 60_000);
+  }
+
+  private stopNotes(): void {
+    if (this.notesTimer) clearInterval(this.notesTimer);
+    this.notesTimer = null;
   }
 
   async download(): Promise<void> {

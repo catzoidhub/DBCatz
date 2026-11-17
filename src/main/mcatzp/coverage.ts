@@ -95,6 +95,7 @@ export const MCATZP_COVERAGE = {
   dvSetGridPrefs: 'not a tool',
   updateState: 'not a tool',
   updateCheck: 'not a tool',
+  updateNotes: 'not a tool',
   updateDownload: 'not a tool',
   updateCancel: 'not a tool',
   updateSkip: 'not a tool',

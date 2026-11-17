@@ -162,6 +162,7 @@ function api(): DbCatzApi {
     }),
     updateState: async () => updater.get(),
     updateCheck: async () => updater.check(true),
+    updateNotes: async () => updater.refreshNotes(),
     updateDownload: async () => updater.download(),
     updateCancel: async () => updater.cancel(),
     updateSkip: async (version) => updater.skip(version),
