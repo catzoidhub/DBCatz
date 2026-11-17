@@ -9,6 +9,8 @@ import { AppServices } from './devcatz';
 import { AskAi } from './ai';
 import { applySettings, migrateToShared, setAiKey, setSettings, settings, startSupportClock } from './settings';
 import { siteBase } from './shared';
+import { Reviews } from './reviews';
+import * as session from './session';
 import { Updater } from './updater';
 import { Reporter } from './reporter';
 import { uninstallPlan, uninstallRun } from './uninstall';
@@ -43,6 +45,8 @@ const viewer = new DbViewerManager(devcatz, docatz);
 const ai = new AskAi(viewer);
 const updater = new Updater();
 const reporter = new Reporter();
+/** Rate DBCatz (Catzoid #96). */
+const reviews = new Reviews();
 let mcatzp: Mcatzp;
 let mcatzpUpdate: string | null = null;
 /** Settings' MCatzP badge: asked once a day while the switch is on, and whenever the page or an install has news. */
@@ -52,24 +56,6 @@ async function checkMcatzpUpdate(): Promise<void> {
   if (next === mcatzpUpdate) return;
   mcatzpUpdate = next;
   viewerWindow()?.webContents.send('viewer:mcatzpUpdate', next);
-}
-const windowReads = new Map<string, (data: unknown) => void>();
-/** What only the window holds (Logs, History). No window, or none answering: there is nothing to read. */
-function askWindow<T>(what: 'log' | 'history', connId: string, db: string): Promise<T[]> {
-  const w = viewerWindow();
-  if (!w || w.isDestroyed()) return Promise.resolve([]);
-  const id = randomUUID();
-  return new Promise((done) => {
-    const timer = setTimeout(() => {
-      windowReads.delete(id);
-      done([]);
-    }, 3000);
-    windowReads.set(id, (data) => {
-      clearTimeout(timer);
-      done(Array.isArray(data) ? (data as T[]) : []);
-    });
-    w.webContents.send('viewer:mcatzpRead', { id, what, connId, db });
-  });
 }
 let mcatzpInstalling: AbortController | null = null;
 const clientId = (id: unknown) => {
@@ -163,6 +149,11 @@ function api(): DbCatzApi {
     updateState: async () => updater.get(),
     updateCheck: async () => updater.check(true),
     updateNotes: async () => updater.refreshNotes(),
+    sessionGet: async () => session.snapshot(),
+    sessionLog: async (connId, entry) => void session.logActivity(String(connId), { ...entry, text: String(entry?.text ?? '') }),
+    sessionRemember: async (connId, db, text) => session.remember(String(connId), String(db), String(text)),
+    sessionTabs: async (tabs, active) => session.setTabs(tabs, Number(active)),
+    ratingSend: async (rating, text) => reviews.send(Number(rating), typeof text === 'string' ? text : null),
     updateDownload: async () => updater.download(),
     updateCancel: async () => updater.cancel(),
     updateSkip: async (version) => updater.skip(version),
@@ -181,6 +172,7 @@ function api(): DbCatzApi {
     uninstallRun: (confirm, shared) =>
       uninstallRun(confirm, shared, async () => {
         updater.stop();
+        reviews.stop();
         reporter.stop();
         await viewer.closeAll();
       }),
@@ -260,10 +252,6 @@ function api(): DbCatzApi {
     },
     mcatzpUpdate: async () => mcatzpUpdate,
     mcatzpPending: async () => mcatzp.pending(),
-    mcatzpWindowReply: async (id, data) => {
-      windowReads.get(String(id))?.(data);
-      windowReads.delete(String(id));
-    },
     mcatzpAnswer: async (id, answer, typed) => mcatzp.answer(String(id), answer === 'once' || answer === 'session' ? answer : 'deny', typeof typed === 'string' ? typed : undefined),
     openUrl: async (url) => {
       // app:licenses — the third-party licences shipped inside the app (Catzoid #66), readable offline
@@ -350,9 +338,10 @@ app.whenReady().then(async () => {
     settingsChanged: () => send('viewer:settings', settings()),
     open: (page) => openViewer(page.connId, page.db, { table: page.table }),
     refresh: () => send('viewer:command', { command: 'refresh' }),
-    logQuery: (connId, r) => send('viewer:mcatzpLog', { connId, ...r }),
-    queryLog: (connId) => askWindow('log', connId, ''),
-    queryHistory: (connId, db) => askWindow('history', connId, db),
+    // MCatzP's queries go into the Logs kept in main (Catzoid #95), and to the window when it is open.
+    logQuery: (connId, r) => send('viewer:mcatzpLog', { connId, ...session.logActivity(connId, r) }),
+    queryLog: async (connId) => session.activityOf(connId),
+    queryHistory: async (connId, db) => session.historyOf(connId, db),
   });
   void mcatzp.set(settings().mcatzp.on).catch(() => undefined);
   setTimeout(() => void checkMcatzpUpdate(), 30_000);
@@ -372,9 +361,16 @@ app.whenReady().then(async () => {
     openViewer(null);
     send('viewer:updateOpen', null);
   };
+  // The window in front opens What's New by itself (Catzoid #97): no notification on top of it.
+  updater.inFront = () => {
+    const w = viewerWindow();
+    return !!w && !w.isDestroyed() && w.isVisible() && w.isFocused() && updater.get().settings.dialog !== false;
+  };
   reporter.onAsk = () => send('viewer:reportsAsk', null);
   reporter.start();
   updater.start();
+  reviews.onChange = () => send('viewer:settings', settings());
+  reviews.start();
   writeBridge(viewer.connections());
   devcatz.onChange = docatz.onChange = () => {
     viewer.servicesChanged();

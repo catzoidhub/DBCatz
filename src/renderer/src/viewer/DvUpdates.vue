@@ -48,7 +48,11 @@ function checkNow() {
         </div>
       </div>
       <div class="opt-row">
-        <span class="flex flex-col"><span class="label-caps">Notify me</span><span class="text-xs opacity-50">A notification once when a new version is out.</span></span>
+        <span class="flex flex-col"><span class="label-caps">Show what's new when an update is found</span><span class="text-xs opacity-50">The update window opens by itself once per version, when you are not busy. Later asks again on the next launch.</span></span>
+        <input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="u.settings.dialog !== false" @change="api.updateConfigure({ dialog: ($event.target as HTMLInputElement).checked })" />
+      </div>
+      <div class="opt-row">
+        <span class="flex flex-col"><span class="label-caps">Notify me</span><span class="text-xs opacity-50">A notification once per new version when DBCatz is not in front (not for a version you skipped).</span></span>
         <input type="checkbox" class="toggle toggle-sm toggle-primary" :checked="u.settings.notify" @change="api.updateConfigure({ notify: ($event.target as HTMLInputElement).checked })" />
       </div>
     </div>

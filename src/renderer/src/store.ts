@@ -62,6 +62,8 @@ export const mcatzpUpdate = ref<string | null>(null);
 /** In-app updates (Catzoid #54): the main process's state, and whether the update dialog is open. */
 export const update = ref<DvUpdateState | null>(null);
 export const updateOpen = ref(false);
+/** What's New opened by itself (Catzoid #97): it then offers "Don't open this on its own". */
+export const updateDialogAuto = ref(false);
 /** Report a Bug / Send Feedback (Catzoid #65): the dialog's kind when open. */
 export const reportOpen = ref<DvReportKind | null>(null);
 /** Ask once, after the first error, whether to send crash reports. */

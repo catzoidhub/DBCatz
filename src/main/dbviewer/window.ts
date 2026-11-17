@@ -1,6 +1,7 @@
-import { app, BrowserWindow, Menu, nativeTheme, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, nativeTheme, screen, type MenuItemConstructorOptions } from 'electron';
 import { join } from 'node:path';
 import { isLinux, isWin } from '../platform';
+import { store } from '../store';
 
 /** Windows and Linux: no menu bar, the system buttons drawn over the tab strip (titleBarOverlay), the ☰ menu. */
 const overlay = isWin || isLinux;
@@ -89,6 +90,35 @@ function titleBarOverlay(): { color: string; symbolColor: string; height: number
 }
 if (overlay) nativeTheme.on('updated', () => win && !win.isDestroyed() && win.setTitleBarOverlay(titleBarOverlay()));
 
+/**
+ * Where the window was (Catzoid #95, as DevCatz): closing it ends its renderer, so it opens again at the size and place
+ * it had. x / y only while they still fit a screen (a display unplugged meanwhile), else the size alone.
+ */
+interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized?: boolean;
+}
+const BOUNDS = 'windowBounds';
+const DEFAULT_SIZE = { width: 1240, height: 780 };
+function savedBounds(): { x?: number; y?: number; width: number; height: number } {
+  const b = store.extra<Bounds>(BOUNDS);
+  if (!b || ![b.x, b.y, b.width, b.height].every(Number.isFinite) || b.width < 860 || b.height < 520) return DEFAULT_SIZE;
+  const area = screen.getDisplayMatching(b).workArea;
+  const fits = b.x >= area.x - 50 && b.y >= area.y - 50 && b.x + b.width <= area.x + area.width + 50 && b.y + b.height <= area.y + area.height + 50;
+  return fits ? { x: b.x, y: b.y, width: b.width, height: b.height } : { width: b.width, height: b.height };
+}
+function saveBounds(w: BrowserWindow): void {
+  try {
+    const maximized = w.isMaximized();
+    store.setExtra(BOUNDS, { ...(maximized ? w.getNormalBounds() : w.getBounds()), maximized });
+  } catch {
+    /* already gone */
+  }
+}
+
 /** Brings the window up as it is, without changing what it shows; opens it when closed. */
 export function showViewer(): void {
   if (win && !win.isDestroyed()) {
@@ -105,8 +135,7 @@ export function openViewer(connId: string | null, db?: string, target: ViewerTar
     return;
   }
   win = new BrowserWindow({
-    width: 1240,
-    height: 780,
+    ...savedBounds(),
     minWidth: 860,
     minHeight: 520,
     title: 'DBCatz',
@@ -127,7 +156,12 @@ export function openViewer(connId: string | null, db?: string, target: ViewerTar
     webPreferences: { preload, sandbox: false, contextIsolation: true },
   });
   const w = win;
-  w.once('ready-to-show', () => w.show());
+  w.once('ready-to-show', () => {
+    if (store.extra<Bounds>(BOUNDS)?.maximized) w.maximize();
+    w.show();
+  });
+  // Closing ends the renderer (the main process keeps jobs, MCatzP, Logs, History and the open tabs): remember where it was.
+  w.on('close', () => saveBounds(w));
   w.webContents.on('render-process-gone', (_e, d) => console.error(`DBCatz renderer gone: ${d.reason} (exit ${d.exitCode})`));
   w.webContents.on('did-start-navigation', (d) => {
     if (d.isMainFrame) console.log(`DBCatz navigation: ${d.url}`);

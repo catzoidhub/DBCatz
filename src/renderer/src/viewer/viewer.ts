@@ -244,14 +244,18 @@ export interface Activity {
   error: string | null;
 }
 export const activity = reactive(new Map<string, Activity[]>());
-export function logActivity(connId: string, a: Omit<Activity, 'time'> & { time?: number }): void {
+/** A query in the Logs; also kept in the main process (`toMain`: not for MCatzP's, which main logged itself), so a
+ * closed and reopened window still has it (Catzoid #95). */
+export function logActivity(connId: string, a: Omit<Activity, 'time'> & { time?: number }, toMain = true): void {
   const list = activity.get(connId) ?? [];
-  list.unshift({ time: a.time ?? Date.now(), text: a.text, ms: a.ms ?? null, affected: a.affected ?? null, error: a.error ?? null });
+  const e = { time: a.time ?? Date.now(), text: a.text, ms: a.ms ?? null, affected: a.affected ?? null, error: a.error ?? null };
+  list.unshift(e);
+  if (toMain) void api.sessionLog(connId, e).catch(() => undefined);
   if (list.length > 500) list.length = 500;
   activity.set(connId, list);
 }
 
-/** Query history per database of a connection (kept for the window's life), like saved queries. */
+/** Query history per database of a connection (kept in the main process for this run of DBCatz), like saved queries. */
 export const history = reactive(new Map<string, string[]>());
 export const historyKey = (connId: string, db: string) => `${connId}\n${db}`;
 export function remember(connId: string, db: string, text: string): void {
@@ -259,6 +263,7 @@ export function remember(connId: string, db: string, text: string): void {
   const list = history.get(key) ?? [];
   const next = [text, ...list.filter((t) => t !== text)].slice(0, 50);
   history.set(key, next);
+  void api.sessionRemember(connId, db, text).catch(() => undefined);
 }
 
 /** Minimal SQL formatter for the Format command: keywords on their own lines. */

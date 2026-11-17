@@ -17,9 +17,10 @@ import CopyName from '../components/CopyName.vue';
 import McatzpPairDialog from './McatzpPairDialog.vue';
 import DvWelcome from './DvWelcome.vue';
 import SupportNudge from './SupportNudge.vue';
+import UpdatePrompt from './UpdatePrompt.vue';
 import CatHeart from '../components/CatHeart.vue';
 import askMark from '../assets/logos/ask-catzoid.svg';
-import { back, changed, forward, goTo } from './nav';
+import { back, changed, forward, goTo, placeOf } from './nav';
 
 /**
  * DBCatz, the database viewer window: a tab strip in the title bar
@@ -32,6 +33,12 @@ const ready = ref(false);
 onMounted(async () => {
   await init();
   await refreshConnections();
+  // This run's Logs, History and open tabs, kept in main while the window was closed (Catzoid #95).
+  const kept = await api.sessionGet().catch(() => null);
+  if (kept) {
+    for (const [id, list] of Object.entries(kept.activity)) activity.set(id, list);
+    for (const [k, list] of Object.entries(kept.history)) history.set(k, list);
+  }
   jobs.value = await api.dvJobs();
   const ended = new Set(jobs.value.filter((j) => j.finished).map((j) => j.id));
   api.onViewerJobs((list) => {
@@ -52,12 +59,8 @@ onMounted(async () => {
   api.onMcatzpAsk((ask) => {
     mcatzpAsk.value = ask;
   });
-  api.onMcatzpLog(({ connId, ...e }) => logActivity(connId, e));
-  api.onMcatzpRead(({ id, what, connId, db }) => {
-    // Plain copies: reactive arrays cannot cross the context bridge.
-    const data = what === 'log' ? (activity.get(connId) ?? []).map((a) => ({ ...a })) : [...(history.get(historyKey(connId, db)) ?? [])];
-    void api.mcatzpWindowReply(id, data);
-  });
+  // MCatzP's queries: main has logged them already.
+  api.onMcatzpLog(({ connId, ...e }) => logActivity(connId, e, false));
   api.onMcatzpUpdate((version) => {
     mcatzpUpdate.value = version;
   });
@@ -108,8 +111,41 @@ onMounted(async () => {
     window.addEventListener('keydown', onMenuKey);
   }
   ready.value = true;
+  // The window opened again in this run without a link to follow: the tabs it had, where they were.
+  if (!props.connId && kept?.tabs.length) {
+    const opened: string[] = [];
+    for (const t of kept.tabs) {
+      const c = connections.value.find((x) => x.id === t.connId);
+      if (!c) continue;
+      openTab(c, { fresh: true, db: t.db, table: t.table, mode: t.mode });
+      opened.push(active.value);
+    }
+    const front = kept.active >= 0 ? kept.tabs[kept.active] : null;
+    const idx = front ? kept.tabs.filter((t) => connections.value.some((x) => x.id === t.connId)).indexOf(front) : -1;
+    active.value = idx >= 0 ? opened[idx] : 'home';
+  }
   changed();
   if (props.connId) open(props.connId, props.db || undefined, { table: props.table, col: props.col, val: props.val });
+  keepTabs();
+  tabTimer = setInterval(keepTabs, 5000);
+  window.addEventListener('beforeunload', keepTabs);
+});
+
+/** The open tabs and where each one is, kept in main so a closed window opens again as it was (Catzoid #95). */
+let tabTimer: ReturnType<typeof setInterval> | null = null;
+function keepTabs() {
+  if (!ready.value) return;
+  const open = tabs.value.filter((t) => t.connection);
+  const list = open.map((t) => {
+    const p = placeOf(t.id);
+    return { connId: t.connection!.id, db: p?.db ?? t.initialDb, table: p?.table ?? t.initialTable, mode: p?.mode ?? t.initialMode };
+  });
+  void api.sessionTabs(list, open.findIndex((t) => t.id === active.value)).catch(() => undefined);
+}
+watch([tabs, active], keepTabs, { deep: true });
+onBeforeUnmount(() => {
+  if (tabTimer) clearInterval(tabTimer);
+  window.removeEventListener('beforeunload', keepTabs);
 });
 
 /** Focuses the connection's tab (made when missing) and, with `db`, switches it to that database. */
@@ -275,6 +311,7 @@ function menuAct(fn: (id: string) => void) {
     <McatzpPairDialog />
     <DvWelcome v-if="ready" />
     <SupportNudge v-if="ready" />
+    <UpdatePrompt v-if="ready" />
 
     <!-- Asked once, after the first error: send crash reports? (Catzoid #65) -->
     <dialog v-if="reportsAsk" open class="modal modal-open">

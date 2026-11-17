@@ -71,6 +71,8 @@ export function onPlace(tab: string, fn: (p: Place) => Promise<void> | void): ()
 
 /** Where each workspace is now (it reports every change). */
 const where = new Map<string, Place>();
+/** Where a tab is now (its database, table and view), for keeping the open tabs while the window is closed. */
+export const placeOf = (tab: string): Place | undefined => where.get(tab);
 const MODE_NAME: Record<string, string> = { data: 'Data', structure: 'Structure', query: 'Query', keys: 'Keys', logs: 'Logs' };
 
 function labelOf(p: Place): string {

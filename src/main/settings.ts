@@ -44,9 +44,27 @@ function local(): Stored {
 
 const time = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined);
 /** Support Catzoid's corner card (Catzoid #94): only numbers and a switch, dropped when unset. */
-function supportOf(s: Partial<Stored>): Pick<Stored, 'supportSince' | 'supportLater' | 'supportLaterAt' | 'supportOff'> {
+function supportOf(s: Partial<Stored>): Pick<Stored, 'supportSince' | 'supportLater' | 'supportLaterAt' | 'supportOff' | 'supportRating' | 'supportRatingQueued'> {
   const later = typeof s.supportLater === 'number' && s.supportLater >= 0 ? Math.min(Math.floor(s.supportLater), 9) : undefined;
-  return { supportSince: time(s.supportSince), supportLater: later, supportLaterAt: time(s.supportLaterAt), supportOff: s.supportOff === true ? true : undefined };
+  const stars = (n: unknown) => typeof n === 'number' && n >= 1 && n <= 5;
+  const text = (t: unknown) => (typeof t === 'string' && t.trim() ? t.slice(0, 1000) : null);
+  const r = s.supportRating;
+  const q = s.supportRatingQueued;
+  return {
+    supportSince: time(s.supportSince),
+    supportLater: later,
+    supportLaterAt: time(s.supportLaterAt),
+    supportOff: s.supportOff === true ? true : undefined,
+    supportRating: r && stars(r.rating) ? { rating: r.rating, text: text(r.text), status: ['none', 'pending', 'approved', 'hidden'].includes(r.status) ? r.status : 'none', version: String(r.version ?? ''), sentAt: time(r.sentAt) ?? 0 } : undefined,
+    supportRatingQueued: q && stars(q.rating) ? { rating: q.rating, text: text(q.text), at: time(q.at) ?? Date.now() } : undefined,
+  };
+}
+
+/** Rate DBCatz (Catzoid #96): only the main process writes the rating the site took, or the one waiting to go. */
+export function setSupportRating(patch: Partial<Pick<Stored, 'supportRating' | 'supportRatingQueued' | 'supportOff'>>): void {
+  const s = stored();
+  Object.assign(s, supportOf({ ...s, ...patch }));
+  store.setExtra(KEY, s);
 }
 
 /** The shared values win where they are set. */

@@ -18,11 +18,21 @@ try {
   /* no storage: treat as seen */
 }
 const devcatz = ref(false);
+const docatz = ref(false);
 const site = ref('');
 onMounted(async () => {
   const info = await api.appInfo().catch(() => null);
   devcatz.value = !!info?.devcatzPath;
+  docatz.value = !!info?.docatzPath;
   site.value = (await api.aboutInfo().catch(() => null))?.site ?? '';
+});
+/** Step 3 for what is installed: DevCatz's database services, DoCatz's database containers, or both. */
+const servicesText = computed(() => {
+  const tail = ', with live status — no host, port or password to copy.';
+  if (devcatz.value && docatz.value) return `The databases DevCatz runs and the database containers in DoCatz are listed under DevCatz services and DoCatz services${tail}`;
+  if (devcatz.value) return `The databases DevCatz runs are listed under DevCatz services${tail} With DoCatz, its database containers show up too.`;
+  if (docatz.value) return `The database containers in DoCatz are listed under DoCatz services${tail} With DevCatz, the databases it runs show up too.`;
+  return 'With DevCatz or DoCatz installed, the databases they run show up here by themselves — no host, port or password to copy.';
 });
 const open = computed(() => !seen.value && connections.value.every((c) => c.serviceId));
 
@@ -87,16 +97,13 @@ const privacy = () => site.value && api.openUrl(`${site.value}/docs/privacy-and-
           <div class="rounded-xl border border-base-300/70 bg-base-200/40 p-4">
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
-                <p class="font-medium">3 · Your DevCatz databases, already here</p>
-                <p class="mt-1 text-sm opacity-70">
-                  {{
-                    devcatz
-                      ? 'The databases DevCatz runs are listed under DevCatz services, with live status — no host, port or password to copy.'
-                      : 'With DevCatz installed, the databases it runs show up here by themselves — no host, port or password to copy.'
-                  }}
-                </p>
+                <p class="font-medium">3 · Your DevCatz and DoCatz databases, already here</p>
+                <p class="mt-1 text-sm opacity-70">{{ servicesText }}</p>
               </div>
-              <span v-if="devcatz" class="badge badge-success badge-sm shrink-0">DevCatz found</span>
+              <span v-if="devcatz || docatz" class="flex shrink-0 flex-col items-end gap-1">
+                <span v-if="devcatz" class="badge badge-success badge-sm">DevCatz found</span>
+                <span v-if="docatz" class="badge badge-success badge-sm">DoCatz found</span>
+              </span>
             </div>
           </div>
         </div>
