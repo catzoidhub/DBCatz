@@ -101,6 +101,7 @@ export const MCATZP_COVERAGE = {
   sessionRemember: 'not a tool',
   sessionTabs: 'not a tool',
   ratingSend: 'never: a rating goes out in the users name',
+  ratingRefresh: 'not a tool',
   updateDownload: 'not a tool',
   updateCancel: 'not a tool',
   updateSkip: 'not a tool',

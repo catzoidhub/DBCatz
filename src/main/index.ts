@@ -153,6 +153,7 @@ function api(): DbCatzApi {
     sessionLog: async (connId, entry) => void session.logActivity(String(connId), { ...entry, text: String(entry?.text ?? '') }),
     sessionRemember: async (connId, db, text) => session.remember(String(connId), String(db), String(text)),
     sessionTabs: async (tabs, active) => session.setTabs(tabs, Number(active)),
+    ratingRefresh: async () => reviews.refresh(),
     ratingSend: async (rating, text) => reviews.send(Number(rating), typeof text === 'string' ? text : null),
     updateDownload: async () => updater.download(),
     updateCancel: async () => updater.cancel(),

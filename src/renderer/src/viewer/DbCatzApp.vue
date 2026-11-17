@@ -2,7 +2,7 @@
 import { currentOS, keyLabel } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { DvConnection } from '@shared/types';
-import { aiOn, api, init, mcatzpAsk, mcatzpInstalling, mcatzpUpdate, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
+import { aiOn, api, init, settings, mcatzpAsk, mcatzpInstalling, mcatzpUpdate, notify, reportOpen, reportsAsk, settingsTab, showSettings, toast, update, updateOpen } from '../store';
 import { DB_LOGO } from '../db';
 import { activity, history, historyKey, logActivity, writeAsk, isKv, isProd, isReadOnly, linkWhere, progress, active, closeOtherTabs, closeTab, connections, cycleTab, dispatch, duplicateTab, editing, jobs, openTab, refreshConnections, showJobs, tabs } from './viewer';
 import DvHome from './DvHome.vue';
@@ -189,6 +189,11 @@ async function openAt(c: DvConnection, db: string | undefined, table: string, co
 
 // ---- Ask DBCatz: the ✦ button bottom-right (⌘K), when AI and the Ask DBCatz feature are on
 const askOpen = ref(false);
+/** The Catzoid team replied to this install's rating and it was not seen in Settings → About yet (Catzoid #96). */
+const replyDot = computed(() => {
+  const s = settings.value;
+  return !!s?.supportRating?.repliedAt && s.supportRating.repliedAt !== s.supportReplySeen;
+});
 /** Support Catzoid (Catzoid #94): the heart in the top bar → Settings → About, scrolled to its card. */
 function openSupport() {
   settingsTab.value = 'about';
@@ -285,8 +290,9 @@ function menuAct(fn: (id: string) => void) {
         Jobs<span v-if="jobs.length" class="badge badge-ghost badge-xs">{{ jobs.length }}</span>
       </button>
       <!-- Support Catzoid (Catzoid #94): small and quiet, always there; no badge, no animation. -->
-      <button class="dv-top-btn support-heart no-drag btn btn-ghost btn-xs btn-square mb-1.5" title="Support Catzoid" @click="openSupport">
+      <button class="dv-top-btn support-heart no-drag btn btn-ghost btn-xs btn-square relative mb-1.5" :title="replyDot ? 'The Catzoid team replied to your rating' : 'Support Catzoid'" @click="openSupport">
         <CatHeart class="size-4 -translate-y-px" />
+        <span v-if="replyDot" class="absolute top-0.5 right-0.5 size-2 rounded-full bg-primary ring-2 ring-base-100" />
       </button>
       <button class="dv-top-btn no-drag btn btn-ghost btn-xs btn-square relative mb-1.5" :class="{ 'btn-active': showSettings }" :title="`Settings (${keyLabel('mod+,')})`" @click="showSettings = !showSettings">
         <span v-if="update?.status === 'available' || update?.status === 'downloaded'" class="absolute top-0.5 right-0.5 size-2 rounded-full bg-primary ring-2 ring-base-100" title="An update is ready" />

@@ -58,6 +58,8 @@ export interface DbCatzSettings {
   supportRating?: SupportRating;
   /** A rating not sent yet (no connection, the site busy): sent again a minute after launch and every hour. */
   supportRatingQueued?: { rating: number; text: string | null; at: number };
+  /** The reply already seen in Settings → About (its repliedAt): a newer one puts a dot on the top bar's heart. */
+  supportReplySeen?: string;
 }
 
 /** One rating of DBCatz (Catzoid #96). status: none = stars only; pending = the text waits for the team. */
@@ -67,6 +69,9 @@ export interface SupportRating {
   status: 'none' | 'pending' | 'approved' | 'hidden';
   version: string;
   sentAt: number;
+  /** The Catzoid team's answer (plain text, line breaks kept) and when it was written. */
+  reply?: string | null;
+  repliedAt?: string | null;
 }
 
 /** Settings → MCatzP: the local channel an AI client reaches DBCatz through. DBCatz's own, per computer. */
@@ -225,7 +230,7 @@ export interface DvLogAnswer {
   /** The fixed (or faster) statement, '' when there is none; opened in the Query tab, never run. */
   query: string;
 }
-export type DbCatzSettingsPatch = { theme?: Theme; ai?: Partial<Omit<DvAiSettings, 'keys'>>; mcatzp?: Partial<Omit<DvMcatzpSettings, 'clients'>>; supportLater?: number; supportLaterAt?: number; supportOff?: boolean };
+export type DbCatzSettingsPatch = { theme?: Theme; ai?: Partial<Omit<DvAiSettings, 'keys'>>; mcatzp?: Partial<Omit<DvMcatzpSettings, 'clients'>>; supportLater?: number; supportLaterAt?: number; supportOff?: boolean; supportReplySeen?: string };
 
 /** Progress of a long task shown in the window (a shape DevCatz uses too). */
 export interface TaskProgress {
@@ -877,6 +882,8 @@ export interface DbCatzApi {
   sessionTabs(tabs: DvSessionTab[], active: number): Promise<void>;
   /** Rate DBCatz (Catzoid #96): 1–5 stars and an optional review to the Catzoid site; queued when offline. */
   ratingSend(rating: number, text: string | null): Promise<{ sent: boolean; queued: boolean }>;
+  /** Reads this install's own review again (the team's reply, the status); quiet when offline. */
+  ratingRefresh(): Promise<void>;
   updateDownload(): Promise<void>;
   updateCancel(): Promise<void>;
   /** Skip this version: the automatic check stays quiet about it. */
@@ -1050,6 +1057,6 @@ export interface DbCatzApi {
 
 /** Every method of the bridge, registered as `dbcatz:<name>` IPC handlers. */
 export const API_METHODS: (keyof DbCatzApi)[] = [
-  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateNotes', 'sessionGet', 'sessionLog', 'sessionRemember', 'sessionTabs', 'ratingSend', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'mcatzpActivity', 'mcatzpClearActivity', 'mcatzpRevoke', 'mcatzpSetup', 'mcatzpInstall', 'mcatzpUninstall', 'mcatzpInstallCancel', 'mcatzpUpdate', 'mcatzpApprovals', 'mcatzpTargets', 'mcatzpAddToClient', 'mcatzpRemoveFromClient', 'mcatzpPending', 'mcatzpAnswer', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
+  'appInfo', 'aboutInfo', 'updateState', 'updateCheck', 'updateNotes', 'sessionGet', 'sessionLog', 'sessionRemember', 'sessionTabs', 'ratingSend', 'ratingRefresh', 'updateDownload', 'updateCancel', 'updateSkip', 'updateInstall', 'updateConfigure', 'reportPreview', 'reportSend', 'captureWindow', 'reportError', 'reportSettings', 'reportConfigure', 'uninstallPlan', 'uninstallRun', 'settings', 'setSettings', 'setAiKey', 'aiModels', 'aiProbe', 'aiTest', 'aiAsk', 'aiAskDbcatz', 'aiPreviewAskDbcatz', 'aiExplainLog', 'aiPreviewLog', 'aiCancel', 'aiPreview', 'aiForget', 'mcatzpActivity', 'mcatzpClearActivity', 'mcatzpRevoke', 'mcatzpSetup', 'mcatzpInstall', 'mcatzpUninstall', 'mcatzpInstallCancel', 'mcatzpUpdate', 'mcatzpApprovals', 'mcatzpTargets', 'mcatzpAddToClient', 'mcatzpRemoveFromClient', 'mcatzpPending', 'mcatzpAnswer', 'openUrl', 'pickFile', 'openInDevCatz', 'openInDoCatz',
   'dvConnections', 'dvSaveConnection', 'dvDeleteConnection', 'dvTestConnection', 'dvServerInfo', 'dvCancelConnect', 'dvDisconnect', 'dvLayout', 'dvSetLayout', 'dvAwsProfiles', 'dvSshKeys', 'dvDatabases', 'dvTables', 'dvStructure', 'dvRows', 'dvUpdateRow', 'dvInsertRow', 'dvDeleteRows', 'dvQuery', 'dvCreateDatabase', 'dvCharsets', 'dvDropDatabase', 'dvCreateTable', 'dvAlterCheck', 'dvAlterTable', 'dvDropTable', 'dvTruncateTable', 'dvDuplicateTable', 'dvDropTables', 'dvTruncateTables', 'dvTypes', 'dvExport', 'dvImport', 'dvBackup', 'dvJobs', 'dvClearJobs', 'dvCancelJob', 'dvReveal', 'dvTableMenu', 'dvAppMenu', 'dvMenuShortcuts', 'dvMenuKey', 'dvPickSqlite', 'dvOpen', 'dvKeys', 'dvKey', 'dvKeySet', 'dvKeyDelete', 'dvKeyRename', 'dvFlush', 'dvSavedQueries', 'dvSaveQuery', 'dvDeleteQuery', 'dvGridPrefs', 'dvSetGridPrefs', 'dvDbPrefs', 'dvSetDbPrefs',
 ];

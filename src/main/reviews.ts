@@ -17,23 +17,53 @@ import { installId } from './updater';
 
 const HOUR = 60 * 60 * 1000;
 
-type Answer = { review?: { rating: number; text: string | null; status: SupportRating['status']; version: string } };
+type Review = { rating: number; text: string | null; status: SupportRating['status']; version: string; reply?: string | null; repliedAt?: string | null };
+type Answer = { review?: Review };
+const DAY = 24 * HOUR;
 
 export class Reviews {
   /** The settings changed here (the window shows them again). */
   onChange: () => void = () => undefined;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private daily: ReturnType<typeof setInterval> | null = null;
 
-  /** Sends a queued rating a minute after launch, then every hour while one waits. */
+  /** Sends a queued rating a minute after launch (then every hour while one waits), and reads the reply once a day. */
   start(): void {
     if (this.timer) return;
-    setTimeout(() => void this.flush(), 60_000);
+    setTimeout(() => void this.flush().then(() => this.refresh()), 60_000);
     this.timer = setInterval(() => void this.flush(), HOUR);
+    this.daily = setInterval(() => void this.refresh(), DAY);
   }
 
   stop(): void {
     if (this.timer) clearInterval(this.timer);
-    this.timer = null;
+    if (this.daily) clearInterval(this.daily);
+    this.timer = this.daily = null;
+  }
+
+  /** Keeps what the site says about this install's review (the reply, the status) in "Your rating". */
+  private keep(v: Review, sentAt?: number): void {
+    const old = settings().supportRating;
+    setSupportRating({
+      supportRating: { rating: v.rating, text: v.text, status: v.status, version: v.version, sentAt: sentAt ?? old?.sentAt ?? Date.now(), reply: v.reply ?? null, repliedAt: v.repliedAt ?? null },
+    });
+    this.onChange();
+  }
+
+  /**
+   * `GET <site>/api/dbcatz/reviews/mine` with the install id in a header (never in the URL): the team's reply and the
+   * status reach the app. Only for an install that rated; once a day, and when Settings → About opens. Quiet on errors.
+   */
+  async refresh(): Promise<void> {
+    if (!settings().supportRating) return;
+    try {
+      const res = await net.fetch(`${siteBase()}/api/dbcatz/reviews/mine`, { headers: { 'X-Catzoid-Install': installId() }, signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) return;
+      const body = (await res.json().catch(() => null)) as Answer | null;
+      if (body?.review) this.keep(body.review);
+    } catch {
+      /* offline: the next time */
+    }
   }
 
   /** Sends the stars (1–5) and the optional text. `queued`: no connection, it goes later by itself. */
@@ -73,9 +103,8 @@ export class Reviews {
       });
       const body = (await res.json().catch(() => null)) as (Answer & { error?: string; issues?: string[] }) | null;
       if (res.ok && body?.review) {
-        const v = body.review;
-        setSupportRating({ supportRating: { rating: v.rating, text: v.text, status: v.status, version: v.version, sentAt: Date.now() }, supportRatingQueued: undefined, supportOff: true });
-        this.onChange();
+        setSupportRating({ supportRatingQueued: undefined, supportOff: true });
+        this.keep(body.review, Date.now());
         return true;
       }
       // The site down or busy, or an older site without reviews yet (a 404 that is not "unknown app"): later.

@@ -44,7 +44,7 @@ function local(): Stored {
 
 const time = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined);
 /** Support Catzoid's corner card (Catzoid #94): only numbers and a switch, dropped when unset. */
-function supportOf(s: Partial<Stored>): Pick<Stored, 'supportSince' | 'supportLater' | 'supportLaterAt' | 'supportOff' | 'supportRating' | 'supportRatingQueued'> {
+function supportOf(s: Partial<Stored>): Pick<Stored, 'supportSince' | 'supportLater' | 'supportLaterAt' | 'supportOff' | 'supportRating' | 'supportRatingQueued' | 'supportReplySeen'> {
   const later = typeof s.supportLater === 'number' && s.supportLater >= 0 ? Math.min(Math.floor(s.supportLater), 9) : undefined;
   const stars = (n: unknown) => typeof n === 'number' && n >= 1 && n <= 5;
   const text = (t: unknown) => (typeof t === 'string' && t.trim() ? t.slice(0, 1000) : null);
@@ -55,8 +55,20 @@ function supportOf(s: Partial<Stored>): Pick<Stored, 'supportSince' | 'supportLa
     supportLater: later,
     supportLaterAt: time(s.supportLaterAt),
     supportOff: s.supportOff === true ? true : undefined,
-    supportRating: r && stars(r.rating) ? { rating: r.rating, text: text(r.text), status: ['none', 'pending', 'approved', 'hidden'].includes(r.status) ? r.status : 'none', version: String(r.version ?? ''), sentAt: time(r.sentAt) ?? 0 } : undefined,
+    supportRating:
+      r && stars(r.rating)
+        ? {
+            rating: r.rating,
+            text: text(r.text),
+            status: ['none', 'pending', 'approved', 'hidden'].includes(r.status) ? r.status : 'none',
+            version: String(r.version ?? ''),
+            sentAt: time(r.sentAt) ?? 0,
+            reply: typeof r.reply === 'string' && r.reply.trim() ? r.reply.slice(0, 2000) : null,
+            repliedAt: typeof r.repliedAt === 'string' && r.repliedAt ? r.repliedAt.slice(0, 40) : null,
+          }
+        : undefined,
     supportRatingQueued: q && stars(q.rating) ? { rating: q.rating, text: text(q.text), at: time(q.at) ?? Date.now() } : undefined,
+    supportReplySeen: typeof s.supportReplySeen === 'string' && s.supportReplySeen ? s.supportReplySeen.slice(0, 40) : undefined,
   };
 }
 
@@ -129,7 +141,7 @@ export function setSettings(patch: DbCatzSettingsPatch): DbCatzSettings {
     if (m.changes !== undefined) s.mcatzp.changes = m.changes === true;
     if (m.connections !== undefined) s.mcatzp.connections = ids(m.connections);
   }
-  const sup = supportOf({ ...s, ...(patch.supportLater !== undefined ? { supportLater: patch.supportLater } : {}), ...(patch.supportLaterAt !== undefined ? { supportLaterAt: patch.supportLaterAt } : {}), ...(patch.supportOff !== undefined ? { supportOff: patch.supportOff } : {}) });
+  const sup = supportOf({ ...s, ...(patch.supportLater !== undefined ? { supportLater: patch.supportLater } : {}), ...(patch.supportLaterAt !== undefined ? { supportLaterAt: patch.supportLaterAt } : {}), ...(patch.supportOff !== undefined ? { supportOff: patch.supportOff } : {}), ...(patch.supportReplySeen !== undefined ? { supportReplySeen: patch.supportReplySeen } : {}) });
   Object.assign(s, sup);
   store.setExtra(KEY, s);
   // The theme and the connection are shared with DevCatz; Ask AI on / off is not.
