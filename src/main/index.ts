@@ -302,7 +302,8 @@ function api(): DbCatzApi {
       return background(viewer.export(connId, r.filePath, options), r.filePath);
     },
     dvImport: async (connId, options) => {
-      const filters = options.format === 'sql' ? [{ name: 'SQL or DBCatz backup', extensions: ['sql', 'gz', 'tgz'] }] : options.format === 'csv' ? [{ name: 'CSV', extensions: ['csv', 'txt'] }] : options.format === 'json' ? [{ name: 'JSON / NDJSON', extensions: ['json', 'ndjson', 'jsonl'] }] : [{ name: 'Redis script or DBCatz backup', extensions: ['redis', 'txt', 'gz', 'tgz'] }];
+      // PostgreSQL also takes pg_dump archives: custom (.dump / .backup), tar, or a directory's toc.dat (TODO §20).
+      const filters = options.format === 'sql' ? [{ name: 'SQL, pg_dump archive or DBCatz backup', extensions: ['sql', 'gz', 'tgz', 'dump', 'backup', 'tar', 'dat', 'pgdump'] }, { name: 'All files', extensions: ['*'] }] : options.format === 'csv' ? [{ name: 'CSV', extensions: ['csv', 'txt'] }] : options.format === 'json' ? [{ name: 'JSON / NDJSON', extensions: ['json', 'ndjson', 'jsonl'] }] : [{ name: 'Redis script or DBCatz backup', extensions: ['redis', 'txt', 'gz', 'tgz'] }];
       const r = await openDialog({ title: 'Import', properties: ['openFile'], filters });
       if (r.canceled || !r.filePaths[0]) return null;
       return background(viewer.import(connId, r.filePaths[0], options), r.filePaths[0]);

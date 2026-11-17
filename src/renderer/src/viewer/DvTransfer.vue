@@ -46,8 +46,13 @@ type ImportFormat = 'sql' | 'csv' | 'json' | 'redis';
 const importFormat = ref<ImportFormat>(isSql(e) ? 'sql' : isKv(e) ? 'redis' : 'json');
 const importTable = ref(props.preselected[0] ?? '');
 const header = ref(true);
+// PostgreSQL: a pg_dump archive (found from the file's content) goes through pg_restore with these (TODO §20).
+const pgClean = ref(false);
+const pgOwners = ref<'auto' | 'skip' | 'keep'>('auto');
+const pgJobs = ref(4);
+const isPg = e === 'postgresql';
 const IMPORTS: { id: ImportFormat; name: string; hint: string; for: (e: DvConnection['engine']) => boolean }[] = [
-  { id: 'sql', name: 'SQL file or backup', hint: '.sql, .sql.gz or a DBCatz .tar.gz backup', for: isSql },
+  { id: 'sql', name: 'SQL file or backup', hint: e === 'postgresql' ? '.sql, .sql.gz, a pg_dump archive or a DBCatz backup' : '.sql, .sql.gz or a DBCatz .tar.gz backup', for: isSql },
   { id: 'csv', name: 'CSV into a table', hint: 'The header row names the columns', for: (x) => isSql(x) || isDoc(x) },
   { id: 'json', name: 'JSON / NDJSON', hint: `Documents into one ${W.table}`, for: isDoc },
   { id: 'redis', name: 'Redis script or backup', hint: 'redis-cli lines or a DBCatz .tar.gz backup', for: isKv },
@@ -69,7 +74,7 @@ async function go() {
   busy.value = true;
   let path: string | null | undefined;
   if (props.mode === 'export') path = await attempt(() => api.dvExport(props.conn.id, { database: props.db, tables: isKv(e) ? (pattern.value.trim() && pattern.value.trim() !== '*' ? [pattern.value.trim()] : []) : [...selected.value], format: format.value, structure: structure.value, data: data.value, dropFirst: dropFirst.value }));
-  else if (props.mode === 'import') path = await attempt(() => api.dvImport(props.conn.id, { database: props.db, format: importFormat.value, table: importTable.value.trim(), header: header.value }));
+  else if (props.mode === 'import') path = await attempt(() => api.dvImport(props.conn.id, { database: props.db, format: importFormat.value, table: importTable.value.trim(), header: header.value, ...(isPg && importFormat.value === 'sql' ? { pg: { clean: pgClean.value, owners: pgOwners.value, jobs: Math.max(1, Math.min(16, Math.round(pgJobs.value) || 1)) } } : {}) }));
   else path = await attempt(() => api.dvBackup(props.conn.id, [...backupDbs.value]));
   busy.value = false;
   if (path === undefined) return; // could not start: the toast says why, the dialog stays
@@ -144,8 +149,24 @@ const title = computed(() => (props.mode === 'export' ? `Export from ${props.db}
           </label>
           <label v-if="importFormat === 'csv'" class="flex cursor-pointer items-center gap-2 self-end pb-1.5 text-sm"><input v-model="header" type="checkbox" class="checkbox checkbox-sm" />First row has column names</label>
         </fieldset>
+        <fieldset v-if="isPg && importFormat === 'sql'" class="space-y-2 rounded-box border border-base-300/60 p-3">
+          <span class="label-caps block">If the file is a pg_dump archive (custom, tar or directory format)</span>
+          <label class="flex cursor-pointer items-center gap-2 text-sm"><input v-model="pgClean" type="checkbox" class="checkbox checkbox-sm" />Replace existing objects <span class="font-mono text-[11px] opacity-50">--clean --if-exists</span></label>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <label class="flex items-center gap-2">
+              Owners and privileges
+              <select v-model="pgOwners" class="select select-sm w-auto">
+                <option value="auto">Skip when a role is missing here</option>
+                <option value="skip">Always skip</option>
+                <option value="keep">Keep as in the dump</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2">Parallel jobs <input v-model.number="pgJobs" type="number" min="1" max="16" class="input input-sm w-16" /></label>
+          </div>
+        </fieldset>
         <p class="text-xs opacity-60">
-          <template v-if="importFormat === 'sql'">Statements run one by one in {{ db }}; a DBCatz backup restores each database it holds (made when missing). Errors stop the import at that statement.</template>
+          <template v-if="importFormat === 'sql' && isPg">DBCatz reads what the file holds, whatever its name: SQL runs statement by statement (a plain pg_dump with COPY data through psql), a pg_dump archive through pg_restore, a DBCatz backup restores each database it holds. Errors stop the import at that statement.</template>
+          <template v-else-if="importFormat === 'sql'">Statements run one by one in {{ db }}; a DBCatz backup restores each database it holds (made when missing). Errors stop the import at that statement.</template>
           <template v-else-if="importFormat === 'redis'">Each line runs as a command in {{ db }}; a DBCatz backup restores every database it holds.</template>
           <template v-else>Rows are inserted one by one so a bad row names itself; empty cells become NULL where the column allows it.</template>
         </p>

@@ -547,6 +547,17 @@ export interface DvImportOptions {
   table: string;
   /** CSV: the first row names the columns. */
   header: boolean;
+  /** PostgreSQL, a pg_dump archive (custom / tar / directory format, found from the file's content): how pg_restore runs. */
+  pg?: DvPgRestoreOptions;
+}
+
+export interface DvPgRestoreOptions {
+  /** Replace existing objects: --clean --if-exists. */
+  clean: boolean;
+  /** --no-owner --no-privileges: always, never, or when a role the dump names is missing here (auto). */
+  owners: 'auto' | 'skip' | 'keep';
+  /** pg_restore -j (custom and directory formats). */
+  jobs: number;
 }
 
 /** A long viewer job (export, import, backup) with progress for the window. */

@@ -38,6 +38,20 @@ export interface Opened {
   user: string;
   /** AWS IAM tokens expire: the driver is reopened after this (ms epoch). */
   renewAt: number | null;
+  /** PostgreSQL: how command-line tools (pg_restore, psql) reach the same server, through the same tunnel. */
+  endpoint?: PgEndpoint;
+}
+
+/** libpq's view of an open PostgreSQL connection: -h / -p / -U, PGPASSWORD, PGSSLMODE (+ PGSSLROOTCERT). */
+export interface PgEndpoint {
+  /** Host name, or the socket's folder. */
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  sslmode: 'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full';
+  /** A CA (PEM) to check the server with (Amazon RDS). */
+  ca?: string;
 }
 
 export type Report = (steps: string[], step: number, detail: string) => void;
@@ -163,7 +177,22 @@ export async function establish(plan: Plan, report: Report, signal: AbortSignal)
     next(o.requireSsl ? (o.verifyCert ? 'certificate checked' : 'certificate not checked') : '');
     driver = connect({ engine: plan.engine, host, port, user, password, database: plan.database, file: '', socket: plan.method === 'socket' ? plan.socket : undefined, options: o, ca, ...settings });
     const version = await abortable(driver.version(), signal);
-    return { driver, tunnel, version, user, renewAt };
+    let endpoint: PgEndpoint | undefined;
+    if (plan.engine === 'postgresql') {
+      // libpq wants the socket's folder and the port the socket file is named after.
+      const sock = plan.method === 'socket' ? plan.socket.replace(/[/\\]+$/, '') : '';
+      const sockFile = /[/\\]\.s\.PGSQL\.(\d+)$/.exec(sock);
+      const sslmode = !o.requireSsl ? 'prefer' : !o.verifyCert ? 'require' : tunnel ? 'verify-ca' : 'verify-full';
+      endpoint = {
+        host: sock ? (sockFile ? sock.slice(0, sockFile.index) : sock) : host,
+        port: sockFile ? Number(sockFile[1]) : port,
+        user,
+        password,
+        sslmode: sock ? 'disable' : sslmode,
+        ca,
+      };
+    }
+    return { driver, tunnel, version, user, renewAt, endpoint };
   } catch (e) {
     void driver?.close().catch(() => undefined);
     tunnel?.close();

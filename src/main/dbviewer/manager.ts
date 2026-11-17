@@ -671,7 +671,11 @@ export class DbViewerManager {
 
   import(id: string, path: string, o: DvImportOptions): Promise<string> {
     this.writable(id, 'Imports');
-    return this.runJob(`Import into ${o.table ? `${o.database}.${o.table}` : o.database}`, path, id, 'import', async (p) => importFrom(await this.driver(id), path, o, p));
+    return this.runJob(`Import into ${o.table ? `${o.database}.${o.table}` : o.database}`, path, id, 'import', async (p) => {
+      const open = await this.open(id);
+      // pg_restore / psql reach the server the way this connection does (its tunnel, socket, SSL).
+      return importFrom(open.driver, path, o, p, open.endpoint ? { endpoint: open.endpoint, serverVersion: open.version } : undefined);
+    });
   }
 
   backup(id: string, path: string, databases: string[]): Promise<string> {

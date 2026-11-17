@@ -10,6 +10,7 @@ import { DV_DOCUMENT, DV_KEYVALUE, DV_SQL } from '@shared/types';
 import { literal, quoteIdent, quoteTable, splitStatements, type Driver } from './driver';
 import { quoteArg } from './nosql';
 import { checkName, insertRow } from './ops';
+import { describe, restoreArchive, runPsql, sniff, type PgCtx } from './pgtools';
 
 /**
  * Export (SQL, CSV, JSON, XML, DOT, redis script), import (SQL / .sql.gz /
@@ -211,12 +212,33 @@ async function writeDot(d: Driver, db: string, only: string[], out: WriteStream,
 
 // ------------------------------------------------------------------ Import
 
-export async function importFrom(d: Driver, path: string, o: DvImportOptions, progress: Progress): Promise<string> {
+/** pg_restore's choices when the dialog sent none (an import from Ask DBCatz or MCatzP). */
+const PG_DEFAULTS = { clean: false, owners: 'auto', jobs: 4 } as const;
+
+export async function importFrom(d: Driver, path: string, o: DvImportOptions, progress: Progress, pg?: PgCtx): Promise<string> {
   const name = basename(path);
-  if (/\.tar\.gz$|\.tgz$/i.test(name)) return importBackup(d, path, progress);
+  let gz = false;
+  if (o.format === 'sql' || o.format === 'redis') {
+    // What the file is comes from its content: a pg_dump -Fc saved as .sql.gz is not SQL (TODO §20).
+    const s = await sniff(path);
+    gz = 'gz' in s && s.gz;
+    if (s.kind === 'pg-custom' || s.kind === 'pg-tar' || s.kind === 'pg-dir') {
+      if (d.engine !== 'postgresql') throw new Error(`${name} is ${describe(s)}; import it into a PostgreSQL connection.`);
+      if (!pg) throw new Error(`${name} is ${describe(s)}; restoring it needs pg_restore, which this import cannot run.`);
+      return restoreArchive(d, pg, path, s, o.database, o.pg ?? PG_DEFAULTS, progress);
+    }
+    if (s.kind === 'tar') return importBackup(d, path, progress);
+    if (s.kind === 'binary') throw new Error(`${name} is not a text ${o.format === 'sql' ? 'SQL file' : 'script'} (it holds binary data), nor a pg_dump archive or a DBCatz backup.`);
+  }
   if (o.format === 'sql') {
     const text = await readText(path);
+    // A plain pg_dump: its data comes as COPY … FROM stdin, which only psql can feed.
+    if (d.engine === 'postgresql' && pg && /^COPY\s.+\sFROM\s+stdin;\s*$/im.test(text)) {
+      const v = /^-- Dumped by pg_dump version (\S+)/m.exec(text)?.[1] ?? null;
+      return runPsql(pg, path, gz, o.database, v, progress);
+    }
     const statements = splitStatements(text);
+    if (!statements.length) throw new Error(`No SQL statements in ${name}`);
     let n = 0;
     for (const s of statements) {
       await d.exec(o.database, s);
@@ -311,8 +333,10 @@ export function parseCsvLine(line: string): string[] {
   return out;
 }
 
+/** A text file, gunzipped when it is gzip (by its first bytes, whatever its name). */
 async function readText(path: string): Promise<string> {
-  if (!/\.gz$/i.test(path)) return readFile(path, 'utf8');
+  const buf = await readFile(path);
+  if (buf[0] !== 0x1f || buf[1] !== 0x8b) return buf.toString('utf8');
   const chunks: Buffer[] = [];
   for await (const c of createReadStream(path).pipe(createGunzip())) chunks.push(c as Buffer);
   return Buffer.concat(chunks).toString('utf8');
