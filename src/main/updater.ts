@@ -266,7 +266,10 @@ export class Updater {
 
   install(now: boolean): void {
     if (this.state.status !== 'downloaded') return;
-    if (now) setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    // Windows: silent, or the assisted NSIS installer (oneClick: false) stops on "Who should this application be
+    // installed for?" and Restart now never comes back (seen in DialCatz 1.2.2 → 1.2.3). It installs for the current
+    // user as before (perMachine: false). Then DBCatz opens again.
+    if (now) setImmediate(() => autoUpdater.quitAndInstall(process.platform === 'win32', true));
     // Otherwise autoInstallOnAppQuit installs it when DBCatz quits.
   }
 
