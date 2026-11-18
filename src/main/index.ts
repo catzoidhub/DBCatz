@@ -99,6 +99,11 @@ function handleLink(raw: string): void {
   }
 }
 
+// Chromium's HTTP cache has no useful limit of its own: it reached 1.2 GB here (every dev-server reload, and an update
+// that electron-updater downloads through net would be kept there next to its own copy). 64 MB is plenty for the
+// renderer and the site's JSON; an entry over 1/8 of it (an update's zip) is not stored at all. As DoCatz ffda519.
+app.commandLine.appendSwitch('disk-cache-size', String(64 * 1024 * 1024));
+
 // One instance: a second launch (Finder, a link) goes to the running one. It exits at once: app.quit() still let it
 // reach whenReady and flash a window of its own with the link (seen on Linux, where links start a second process).
 if (!app.requestSingleInstanceLock()) app.exit(0);
