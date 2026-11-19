@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { api, attempt, update, updateDialogAuto } from '../store';
+import { api, attempt, settings, update, updateDialogAuto } from '../store';
+import { openCommunity, openDonate } from '../support';
 import { connections, jobs } from './viewer';
 import CatMood from './CatMood.vue';
 import dbcatzLogo from '../assets/logos/dbcatz.png';
@@ -96,6 +97,11 @@ onMounted(() => {
 /** What's New lists the notes; with none at all it still shows the newest version and the site link. */
 const notes = computed(() => (u.value?.notes?.length ? u.value.notes : u.value?.version ? [{ version: u.value.version, date: u.value.releaseDate ?? null, notes: '' }] : []));
 /** "Don't open this on its own" (Catzoid #97), shown when the dialog opened by itself; Settings → Updates has it too. */
+/**
+ * Support Catzoid at the end of What's New (Catzoid #94, as DevCatz 058fc2e): one quiet line, the same links as
+ * Settings → About. Gone once the corner card is done with (joined, donated, rated or "Don't show again": supportOff).
+ */
+const supportLine = computed(() => !settings.value?.supportOff);
 const quiet = (off: boolean) => attempt(() => api.updateConfigure({ dialog: !off }));
 </script>
 
@@ -132,6 +138,11 @@ const quiet = (off: boolean) => attempt(() => api.updateConfigure({ dialog: !off
             <button type="button" class="link link-hover" @click="u.notesUrl && api.openUrl(u.notesUrl)">Read them on the site</button>
           </p>
         </section>
+        <p v-if="supportLine" class="border-t border-base-300/60 pt-3 text-xs opacity-60">
+          Catzoid is free and open source.
+          <button type="button" class="link" @click="openCommunity">Joining the community</button> already helps a lot — or
+          <button type="button" class="link" @click="openDonate">support us</button> if you like.
+        </p>
       </div>
 
       <!-- Download -->
