@@ -9,7 +9,7 @@
   <a href="https://catzoid.com/community">Community</a>
 </p>
 
-A database client for macOS, Windows and Linux: MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch in one window, a tab per connection — local servers, through SSH, on AWS with IAM, or with credentials from Vault. Production mode asks before every write, read-only stays read-only, and an optional AI writes the query while you press Run.
+A database client for developers on macOS (Apple silicon and Intel), Windows 10 / 11 and Linux: MySQL, MariaDB, PostgreSQL, SQLite, Redis, Valkey, MongoDB and Elasticsearch in one window, a tab per connection — local servers, through SSH, on AWS with IAM, or with credentials from Vault. Production mode asks before every write, read-only stays read-only, big tables stay light, and an optional AI writes the query while you press Run.
 
 Part of [Catzoid](https://catzoid.com) — free, open-source developer tools with nine lives. All cats, no catch: no
 account, no Pro tier, nothing locked behind a payment.
@@ -17,10 +17,13 @@ account, no Pro tier, nothing locked behind a payment.
 ## What it does
 
 - **Connect** by hand, over SSH, with AWS IAM or Vault — or paste a URL (`postgres://…`, a whole `DATABASE_URL=` line works too). Passwords stay in the macOS Keychain, encrypted for your account on Windows, and on Linux encrypted with a key your desktop keyring keeps.
-- **Browse and edit** — data grid with filters, structure, indexes, export and import, a query editor with history.
+- **Browse and edit** — data grid with filters, structure, indexes, export and import (pg_dump archives restore through pg_restore), a query editor with history.
+- **Big tables** — a query keeps its first 1,000 rows and leaves the rest on the server (Load more, up to 50,000); a large table opens with the server's row estimate and **Count exactly** when you want the real number.
 - **Production safety** — Production and Read-only modes per connection, typed confirmations for risky statements.
-- **AI, optional** — Ask in plain words; only structure is sent, never your rows unless you allow samples.
-- **The family** — databases [DevCatz](https://github.com/catzoidhub/DevCatz) runs show up by themselves; [DialCatz](https://github.com/catzoidhub/DialCatz) opens the table a request touched.
+- **AI, optional** — Ask DBCatz, and Ask AI in Query and Logs, with your own provider (Claude, OpenAI, Gemini, Ollama …). Only structure is sent, never your rows unless you allow samples.
+- **MCatzP** — 46 tools for AI assistants through [MCatzP](https://github.com/catzoidhub/MCatzP), the Catzoid MCP server; every change waits for your confirmation in the app.
+- **The family** — databases [DevCatz](https://github.com/catzoidhub/DevCatz) and [DoCatz](https://github.com/catzoidhub/DoCatz) run show up by themselves; [DialCatz](https://github.com/catzoidhub/DialCatz) opens the table a request touched (Check in DBCatz).
+- **Light and current** — on macOS, closing the window frees its memory and brings your tabs back when you open it again; What's New shows each version's notes, and you can rate DBCatz from Settings → About.
 
 ## Install
 
@@ -33,15 +36,16 @@ brew tap catzoidhub/catz && brew trust catzoidhub/catz
 brew install --cask dbcatz
 ```
 
-The app is signed and notarized by Apple and updates itself (Settings → About → Check for Updates).
+The macOS app is signed and notarized by Apple and updates itself (Settings → About → Check for Updates).
 
 Windows 10 / 11 (x64): `DBCatz-Setup-<version>.exe` from the same page or the
 [latest release](https://github.com/catzoidhub/DBCatz/releases/latest). It installs for your account only, no
-administrator rights needed. It is not code-signed yet (see Code signing below).
+administrator rights needed, and it updates itself. It is not code-signed yet (see Code signing below).
 
-Linux (x64): `DBCatz-<version>-x64.AppImage` or `DBCatz-<version>-amd64.deb` from the same page or the
+Linux (x64 and ARM64): `DBCatz-<version>-x64.AppImage` / `-arm64.AppImage` or `DBCatz-<version>-amd64.deb` /
+`-arm64.deb` from the same page or the
 [latest release](https://github.com/catzoidhub/DBCatz/releases/latest). The AppImage offers to install itself into
-`~/Applications` with a menu entry on its first run; the `.deb` suits Ubuntu and Debian. Neither is signed yet.
+`~/Applications` with a menu entry on its first run; the `.deb` suits Ubuntu and Debian. Neither is signed yet; both update themselves.
 
 ## Build from source
 
