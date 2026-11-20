@@ -47,7 +47,11 @@ const confirmDelete = ref(false);
 const busy = ref(false);
 const filterInput = ref<HTMLInputElement | null>(null);
 
+/** The count is exact unless the server's estimate or an unfinished count stands in for it (TODO §23). */
+const exactTotal = computed(() => !result.value?.totalKind || result.value.totalKind === 'exact');
 const pages = computed(() => Math.max(1, Math.ceil((result.value?.total ?? 0) / PAGE)));
+/** Without an exact count, the next page is there when this one is full. */
+const hasNext = computed(() => (exactTotal.value ? page.value < pages.value - 1 : (result.value?.rows.length ?? 0) >= PAGE));
 const pk = computed(() => result.value?.primaryKey ?? []);
 const editable = computed(() => pk.value.length > 0 && pk.value.every((k) => result.value?.columns.includes(k)));
 const colInfo = (name: string) => structure.value?.columns.find((c) => c.name === name);
@@ -178,7 +182,9 @@ function follow(col: string, v: unknown) {
   emit('follow', { table: fk.refTable, where: `${ident(fk.refColumn)} = ${literal(v)}`, from: where.value });
 }
 
-async function load() {
+/** The table and filter the shown count belongs to: a new page or sort keeps it instead of counting again. */
+let countedFor = '';
+async function load(count: 'auto' | 'exact' | 'skip' = 'auto') {
   if (props.preset) {
     result.value = props.preset;
     structure.value ??= await api.dvStructure(props.conn.id, props.db, props.table).catch(() => null);
@@ -188,7 +194,11 @@ async function load() {
   loading.value = true;
   error.value = null;
   try {
-    result.value = await api.dvRows(props.conn.id, props.db, props.table, { offset: page.value * PAGE, limit: PAGE, orderBy: orderBy.value, desc: desc.value, where: where.value });
+    const key = `${props.db}\n${props.table}\n${where.value}`;
+    const keep = count === 'skip' && countedFor === key && result.value ? { total: result.value.total, totalKind: result.value.totalKind } : null;
+    const r = await api.dvRows(props.conn.id, props.db, props.table, { offset: page.value * PAGE, limit: PAGE, orderBy: orderBy.value, desc: desc.value, where: where.value, count: keep ? 'skip' : count === 'skip' ? 'auto' : count });
+    result.value = keep ? { ...r, ...keep } : r;
+    countedFor = key;
     structure.value ??= await api.dvStructure(props.conn.id, props.db, props.table).catch(() => null);
   } catch (e) {
     error.value = String((e as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -200,12 +210,13 @@ onMounted(() => {
   void load();
   void loadPrefs();
 });
-watch([page, orderBy, desc, where], load);
+// A new filter counts again; a new page or sort keeps the count.
+watch([page, orderBy, desc, where], (now, was) => void load(now[3] !== was[3] ? 'auto' : 'skip'));
 watch(
   () => props.preset,
   () => void load(),
 );
-defineExpose({ startInsert, deleteSelected, focusFilter, reload: load });
+defineExpose({ startInsert, deleteSelected, focusFilter, reload: () => load() });
 
 function sort(col: string) {
   if (props.preset || suppressSort) return;
@@ -227,6 +238,7 @@ function focusFilter() {
   filterInput.value?.select();
 }
 const reload = () => (props.preset ? emit('rerun') : load());
+const countExactly = () => load('exact');
 
 function keyOf(row: unknown[]): Record<string, unknown> {
   const cols = result.value!.columns;
@@ -507,7 +519,11 @@ function display(v: unknown, col: string): string {
     <!-- Footer: paging, timing, insert actions -->
     <div class="flex h-9 shrink-0 items-center gap-3 border-t border-base-300/60 px-3 text-xs">
       <template v-if="result">
-        <span class="tabular-nums opacity-70">{{ fmtNum(result.total) }} {{ result.total === 1 ? W.row : W.rows }}<template v-if="where"> match</template> · {{ fmtMs(result.ms) }}</span>
+        <span class="tabular-nums opacity-70">
+          <template v-if="result.totalKind === 'unknown'">Many {{ W.rows }}</template>
+          <template v-else>{{ result.totalKind === 'estimate' ? 'About ' : '' }}{{ fmtNum(result.total) }} {{ result.total === 1 ? W.row : W.rows }}</template><template v-if="where"> match</template> · {{ fmtMs(result.ms) }}
+        </span>
+        <button v-if="!preset && !exactTotal" type="button" class="link link-hover opacity-70" :disabled="loading" :title="result.totalKind === 'estimate' ? 'The server\'s estimate: counting every row can take a while on a big table' : 'Counting took longer than 5 s'" @click="countExactly">Count exactly</button>
         <span v-if="!editable" class="opacity-50" title="A primary key is needed to edit rows in place">read-only (no primary key)</span>
         <span v-else-if="readOnly" class="opacity-50">read-only connection</span>
         <span v-else class="opacity-40">double-click a cell to edit</span>
@@ -516,9 +532,9 @@ function display(v: unknown, col: string): string {
         <div v-if="!preset" class="join">
           <button class="btn btn-ghost btn-xs join-item" :disabled="page === 0" @click="page = 0">«</button>
           <button class="btn btn-ghost btn-xs join-item" :disabled="page === 0" @click="page--">‹</button>
-          <span class="join-item flex items-center px-2 tabular-nums">{{ page + 1 }} / {{ pages }}</span>
-          <button class="btn btn-ghost btn-xs join-item" :disabled="page >= pages - 1" @click="page++">›</button>
-          <button class="btn btn-ghost btn-xs join-item" :disabled="page >= pages - 1" @click="page = pages - 1">»</button>
+          <span class="join-item flex items-center px-2 tabular-nums">{{ page + 1 }}<template v-if="exactTotal"> / {{ pages }}</template></span>
+          <button class="btn btn-ghost btn-xs join-item" :disabled="!hasNext" @click="page++">›</button>
+          <button class="btn btn-ghost btn-xs join-item" :disabled="!exactTotal || page >= pages - 1" :title="exactTotal ? undefined : 'The last page needs an exact count'" @click="page = pages - 1">»</button>
         </div>
       </template>
     </div>
