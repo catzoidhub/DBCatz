@@ -483,20 +483,33 @@ export interface DvRowsQuery {
   desc: boolean;
   /** A WHERE clause written by the user (without WHERE). */
   where: string;
+  /**
+   * How to count the rows (TODO §23): 'auto' (left out) uses the server's estimate for a big table without a filter and
+   * gives a filtered count 5 s; 'exact' counts with up to 2 minutes; 'skip' does not count (a new page or sort).
+   */
+  count?: 'auto' | 'exact' | 'skip';
 }
 
 export interface DvRows {
   columns: string[];
   rows: unknown[][];
   total: number;
+  /** What `total` is: counted, the server's estimate, unknown (the count took too long) or not counted (count: 'skip'). Exact when left out. */
+  totalKind?: 'exact' | 'estimate' | 'unknown' | 'skipped';
   primaryKey: string[];
   ms: number;
 }
+
+/** Rows a query tab result keeps at first, and the most "Load more" goes to (TODO §23). */
+export const DV_QUERY_ROWS = 1000;
+export const DV_QUERY_ROWS_MAX = 50_000;
 
 export interface DvResult {
   statement: string;
   columns: string[];
   rows: unknown[][];
+  /** The statement had more rows than were kept. */
+  more?: boolean;
   /** Rows changed by a write. */
   affected: number | null;
   ms: number;
@@ -985,7 +998,8 @@ export interface DbCatzApi {
   dvInsertRow(connId: string, database: string, table: string, values: Record<string, unknown>): Promise<void>;
   dvDeleteRows(connId: string, database: string, table: string, keys: Record<string, unknown>[]): Promise<number>;
   /** Runs one or more statements; each gets its own result. */
-  dvQuery(connId: string, database: string, sql: string): Promise<DvResult[]>;
+  /** `max`: rows kept per statement, DV_QUERY_ROWS when left out. */
+  dvQuery(connId: string, database: string, sql: string, max?: number): Promise<DvResult[]>;
   /** MySQL / MariaDB: character set + collation; PostgreSQL: encoding + LC_COLLATE (from template0). */
   dvCreateDatabase(connId: string, name: string, options?: { charset: string; collation: string }): Promise<void>;
   dvCharsets(connId: string): Promise<DvCharsets>;

@@ -1,5 +1,5 @@
 import type { DvAlterOp, DvColumnDef, DvEngine, DvResult, DvRows, DvRowsQuery } from '@shared/types';
-import { DV_SQL } from '@shared/types';
+import { DV_QUERY_ROWS, DV_QUERY_ROWS_MAX, DV_SQL } from '@shared/types';
 import { splitQuery } from '@shared/sqlsplit';
 import { quoteIdent, quoteTable, type Driver } from './driver';
 
@@ -49,9 +49,43 @@ export async function rows(d: Driver, db: string, table: string, q: DvRowsQuery)
   const st = await d.structure(db, table);
   const [data, count] = await Promise.all([
     d.query(db, `SELECT * FROM ${t}${where}${order} LIMIT ${Math.max(1, Math.floor(q.limit))} OFFSET ${Math.max(0, Math.floor(q.offset))}`),
-    d.query(db, `SELECT COUNT(*) FROM ${t}${where}`),
+    countRows(d, db, table, where, q.count ?? 'auto'),
   ]);
-  return { columns: data.columns, rows: data.rows, total: Number(count.rows[0]?.[0] ?? 0), primaryKey: st.primaryKey, ms: Date.now() - t0 };
+  return { columns: data.columns, rows: data.rows, total: count.n, totalKind: count.kind, primaryKey: st.primaryKey, ms: Date.now() - t0 };
+}
+
+/** Above this many rows (the server's estimate) a table without a filter is not counted: COUNT(*) reads all of it. */
+const BIG_TABLE = 200_000;
+
+/**
+ * The grid's row count (TODO §23). A full COUNT(*) on tens of millions of rows takes seconds and ran with every page:
+ * now a page or a sort does not count, a big table shows the server's estimate, and a filtered count stops at 5 s.
+ */
+async function countRows(d: Driver, db: string, table: string, where: string, mode: 'auto' | 'exact' | 'skip'): Promise<{ n: number; kind: NonNullable<DvRows['totalKind']> }> {
+  if (mode === 'skip') return { n: 0, kind: 'skipped' };
+  if (mode === 'auto' && !where) {
+    const est = await estimateRows(d, db, table).catch(() => null);
+    if (est !== null && est > BIG_TABLE) return { n: est, kind: 'estimate' };
+  }
+  const sql = `SELECT COUNT(*) FROM ${quoteTable(d.engine, table)}${where}`;
+  if (!d.queryWithin) return { n: Number((await d.query(db, sql)).rows[0]?.[0] ?? 0), kind: 'exact' };
+  try {
+    return { n: Number((await d.queryWithin(db, sql, mode === 'exact' ? 120_000 : 5_000)).rows[0]?.[0] ?? 0), kind: 'exact' };
+  } catch (e) {
+    if (/statement timeout|canceling statement|maximum statement execution time|max_statement_time|execution was interrupted/i.test(String((e as Error).message))) return { n: 0, kind: 'unknown' };
+    throw e;
+  }
+}
+
+/** The server's own idea of a table's size: pg_class.reltuples / information_schema TABLE_ROWS; null without one. */
+async function estimateRows(d: Driver, db: string, table: string): Promise<number | null> {
+  let r;
+  if (d.engine === 'postgresql') r = await d.query(db, 'SELECT reltuples::bigint FROM pg_class WHERE oid = to_regclass(?)', [quoteTable(d.engine, table)]);
+  else if (d.engine === 'mysql' || d.engine === 'mariadb') r = await d.query(db, 'SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?', [db, table]);
+  else return null;
+  const v = r.rows[0]?.[0];
+  const n = v === null || v === undefined ? NaN : Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 export async function updateRow(d: Driver, db: string, table: string, key: Record<string, unknown>, changes: Record<string, unknown>) {
@@ -89,14 +123,20 @@ export async function deleteRows(d: Driver, db: string, table: string, keys: Rec
 }
 
 /** Runs a script statement by statement; an error stops at that statement. */
-export async function runQuery(d: Driver, db: string, text: string): Promise<DvResult[]> {
+/**
+ * The query tab's statements, one by one. Each keeps at most `max` rows (TODO §23): engines with queryRows leave the
+ * rest on the server; the others (MongoDB caps its own, Redis, Elasticsearch) are cut here.
+ */
+export async function runQuery(d: Driver, db: string, text: string, max = DV_QUERY_ROWS): Promise<DvResult[]> {
   const statements = splitQuery(d.engine, text);
   const out: DvResult[] = [];
+  const cap = Math.min(Math.max(1, Math.floor(max)), DV_QUERY_ROWS_MAX);
   for (const statement of statements) {
     const t0 = Date.now();
     try {
-      const r = await d.query(db, statement);
-      out.push({ statement, columns: r.columns, rows: r.rows.slice(0, 5000), affected: r.affected, ms: Date.now() - t0, error: null });
+      const r = d.queryRows ? await d.queryRows(db, statement, cap) : await d.query(db, statement);
+      const more = 'more' in r ? Boolean(r.more) : r.rows.length > cap;
+      out.push({ statement, columns: r.columns, rows: r.rows.slice(0, cap), affected: r.affected, ms: Date.now() - t0, error: null, more });
     } catch (e) {
       out.push({ statement, columns: [], rows: [], affected: null, ms: Date.now() - t0, error: (e as Error).message });
       break;

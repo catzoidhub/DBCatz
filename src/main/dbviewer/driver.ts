@@ -51,6 +51,14 @@ export interface QueryResult {
   affected: number | null;
 }
 
+/** A result cut at `max` rows; `more` when the statement had more (TODO §23). */
+export type CappedResult = QueryResult & { more: boolean };
+
+/** The statement without its leading comments. */
+const leadOf = (sql: string) => sql.replace(/^(\s*(--[^\n]*\n?|#[^\n]*\n?|\/\*[\s\S]*?\*\/))+/, '').trimStart();
+/** Statements that return rows, so they can stop reading after the first `max`. */
+const READS = /^\(*\s*(SELECT|WITH|VALUES|TABLE|SHOW|EXPLAIN|DESCRIBE|DESC)\b/i;
+
 export interface Driver {
   readonly engine: DvEngine;
   version(): Promise<string>;
@@ -60,6 +68,13 @@ export interface Driver {
   structure(db: string, table: string): Promise<DvStructure>;
   /** One statement, with ? placeholders (the driver adapts them). */
   query(db: string, sql: string, params?: unknown[]): Promise<QueryResult>;
+  /**
+   * One statement from the query tab, keeping at most `max` rows and leaving the rest on the server: a SELECT without
+   * LIMIT on millions of rows would otherwise load all of them into memory. Engines without it get query(), cut.
+   */
+  queryRows?(db: string, sql: string, max: number): Promise<CappedResult>;
+  /** A read that the server stops after `ms` (a COUNT(*) on a huge table); it fails like any other error then. */
+  queryWithin?(db: string, sql: string, ms: number): Promise<QueryResult>;
   /** Several statements at once (imports, DDL scripts). */
   exec(db: string, sql: string): Promise<void>;
   close(): Promise<void>;
@@ -284,6 +299,43 @@ class MysqlDriver implements Driver {
     });
   }
 
+  async queryWithin(db: string, sql: string, ms: number): Promise<QueryResult> {
+    const text =
+      this.engine === 'mariadb' ? `SET STATEMENT max_statement_time=${Math.max(1, Math.ceil(ms / 1000))} FOR ${sql}` : sql.replace(/^\s*SELECT\b/i, `SELECT /*+ MAX_EXECUTION_TIME(${Math.floor(ms)}) */`);
+    return this.query(db, text);
+  }
+
+  /** Reads stream, and the connection is dropped after `max` rows: MySQL has no way to stop a result half way. */
+  async queryRows(db: string, sql: string, max: number): Promise<CappedResult> {
+    if (!READS.test(leadOf(sql))) return { ...(await this.query(db, sql)), more: false };
+    const c = await this.pool.getConnection();
+    let dropped = false;
+    try {
+      if (db) await c.query(`USE ${quoteIdent('mysql', db)}`);
+      return await new Promise<CappedResult>((resolve, reject) => {
+        const rows: unknown[][] = [];
+        let columns: string[] = [];
+        let affected: number | null = null;
+        const q = (c as unknown as { connection: { query(o: object): NodeJS.EventEmitter } }).connection.query({ sql, rowsAsArray: true });
+        q.on('fields', (f: mysql.FieldPacket[]) => {
+          if (!columns.length) columns = f.map((x) => x.name);
+        });
+        q.on('result', (r: unknown) => {
+          if (dropped) return;
+          if (!Array.isArray(r)) return void (affected = (r as mysql.ResultSetHeader).affectedRows ?? null);
+          if (rows.length < max) return void rows.push(r.map(cell));
+          dropped = true;
+          c.destroy();
+          resolve({ columns, rows, affected: null, more: true });
+        });
+        q.on('error', (e: Error) => !dropped && reject(e));
+        q.on('end', () => !dropped && resolve({ columns, rows, affected: columns.length ? null : affected, more: false }));
+      });
+    } finally {
+      if (!dropped) c.release();
+    }
+  }
+
   async exec(db: string, sql: string) {
     await this.on(db, (c) => c.query(sql));
   }
@@ -443,6 +495,56 @@ class PgDriver implements Driver {
     return { columns: [], rows: [], affected: r.rowCount ?? null };
   }
 
+  async queryWithin(db: string, sql: string, ms: number): Promise<QueryResult> {
+    const c = await this.pool(db).connect();
+    try {
+      await c.query('BEGIN');
+      await c.query(`SET LOCAL statement_timeout = ${Math.floor(ms)}`);
+      const r = await c.query({ text: sql, rowMode: 'array' });
+      await c.query('COMMIT');
+      c.release();
+      return { columns: (r.fields ?? []).map((f) => f.name), rows: (r.rows as unknown[][]).map((row) => row.map(cell)), affected: null };
+    } catch (e) {
+      const ok = await c.query('ROLLBACK').then(() => true, () => false);
+      c.release(!ok);
+      throw e;
+    }
+  }
+
+  /**
+   * Reads go through a cursor, so the server sends only the first `max` rows (plus one to know there are more). DECLARE
+   * refuses a few reads (a data-modifying WITH, SELECT … INTO) before running them: those run as they are.
+   */
+  async queryRows(db: string, sql: string, max: number): Promise<CappedResult> {
+    const body = sql.trim().replace(/;\s*$/, '');
+    if (!/^\(*\s*(SELECT|WITH|VALUES|TABLE)\b/i.test(leadOf(body))) return { ...(await this.query(db, sql)), more: false };
+    const c = await this.pool(db).connect();
+    let plain = false;
+    try {
+      await c.query('BEGIN');
+      try {
+        await c.query(`DECLARE dbcatz_rows NO SCROLL CURSOR FOR ${body}`);
+      } catch {
+        plain = true;
+      }
+      if (plain) {
+        await c.query('ROLLBACK');
+      } else {
+        const r = await c.query({ text: `FETCH FORWARD ${max + 1} FROM dbcatz_rows`, rowMode: 'array' });
+        await c.query('COMMIT');
+        c.release();
+        return { columns: (r.fields ?? []).map((f) => f.name), rows: (r.rows as unknown[][]).slice(0, max).map((row) => row.map(cell)), affected: null, more: r.rows.length > max };
+      }
+    } catch (e) {
+      // A failed read: end the transaction, and drop the connection if even that fails.
+      const ok = await c.query('ROLLBACK').then(() => true, () => false);
+      c.release(!ok);
+      throw e;
+    }
+    c.release();
+    return { ...(await this.query(db, sql)), more: false };
+  }
+
   async exec(db: string, sql: string) {
     await this.pool(db).query(sql);
   }
@@ -578,6 +680,24 @@ class SqliteDriver implements Driver {
     }
     const r = st.run(...values);
     return { columns: [], rows: [], affected: Number(r.changes) };
+  }
+
+  /** Rows are read one by one and the statement stops after `max`. */
+  async queryRows(db: string, sql: string, max: number): Promise<CappedResult> {
+    const st = this.open(db).prepare(sql);
+    const cols = st.columns();
+    if (!cols.length) return { ...(await this.query(db, sql)), more: false };
+    st.setReturnArrays(true);
+    const rows: unknown[][] = [];
+    let more = false;
+    for (const r of st.iterate()) {
+      if (rows.length === max) {
+        more = true;
+        break;
+      }
+      rows.push((r as unknown as unknown[]).map(cell));
+    }
+    return { columns: cols.map((c) => c.name), rows, affected: null, more };
   }
 
   async exec(db: string, sql: string) {

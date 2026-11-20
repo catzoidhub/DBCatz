@@ -366,7 +366,7 @@ export class DbViewerManager {
    * A query for MCatzP, already checked to be a read (mcatzp/readquery.ts). Stops waiting at the time limit or when the
    * client gives up, and drops that connection, so a runaway statement does not hold the next one up.
    */
-  async readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal): Promise<DvResult[]> {
+  async readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal, max?: number): Promise<DvResult[]> {
     const engine = this.planOf(id).engine;
     const server = engine === 'mysql' || engine === 'mariadb' || engine === 'postgresql';
     const d = await (server ? this.reader(id) : this.driver(id));
@@ -378,7 +378,7 @@ export class DbViewerManager {
       signal.addEventListener('abort', onAbort, { once: true });
     });
     try {
-      return await Promise.race([ops.runQuery(d, db, text), stopped]);
+      return await Promise.race([ops.runQuery(d, db, text, max), stopped]);
     } catch (e) {
       if (server) this.releaseReader(id);
       throw e;
@@ -718,10 +718,10 @@ export class DbViewerManager {
       dvUpdateRow: async (id, db, t, key, changes) => (this.writable(id, 'Edits'), ops.updateRow(await D(id), db, t, key, changes)),
       dvInsertRow: async (id, db, t, values) => (this.writable(id, 'Inserts'), ops.insertRow(await D(id), db, t, values)),
       dvDeleteRows: async (id, db, t, keys) => (this.writable(id, 'Deletes'), ops.deleteRows(await D(id), db, t, keys)),
-      dvQuery: async (id, db, sql) => {
+      dvQuery: async (id, db, sql, max) => {
         const d = await D(id);
         this.readOnlyQuery(id, d.engine, sql);
-        return ops.runQuery(d, db, sql);
+        return ops.runQuery(d, db, sql, max);
       },
       dvCreateDatabase: async (id, name, options) => (this.writable(id, 'New databases'), ops.createDatabase(await D(id), name, options)),
       dvCharsets: async (id) => {

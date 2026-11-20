@@ -64,7 +64,7 @@ export interface Scopes {
 
 /** The part of the viewer the read tier needs beyond the API. */
 export interface ReadQuery {
-  readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal): Promise<DvResult[]>;
+  readQuery(id: string, db: string, text: string, timeoutMs: number, signal: AbortSignal, max?: number): Promise<DvResult[]>;
 }
 
 /** A statement that works on something secret-looking under another name: an alias or a function hides the column's own name. */
@@ -89,7 +89,7 @@ export function resultsOut(results: DvResult[], max: number, engine: DbEngine): 
     const hidden = !kv && hidesSecret(r.statement, r.columns);
     const page = (kv ? redisRows(r.statement, r.rows) : r.rows).slice(0, max);
     const out = hidden ? { rows: page.map((row) => Object.fromEntries(r.columns.map((c, i) => [c, row[i] === null ? null : '•••']))), masked: r.columns } : rowsOut(r.columns, page);
-    return { statement: r.statement, columns: r.columns, rowCount: r.rows.length, ...(r.affected !== null ? { affected: r.affected } : {}), ...(r.rows.length > max ? { cutAt: max } : {}), ...out, ms: r.ms };
+    return { statement: r.statement, columns: r.columns, rowCount: r.rows.length, ...(r.affected !== null ? { affected: r.affected } : {}), ...(r.more || r.rows.length > max ? { cutAt: max } : {}), ...out, ms: r.ms };
   });
 }
 
@@ -186,7 +186,7 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes, w
         const c = await conn(connection);
         // No WHERE from here: a filter is SQL, and SQL goes through run_read_query's check.
         const r = await api.dvRows(c.id, String(database), String(table), { limit: Number(limit ?? 50), offset: Number(offset ?? 0), orderBy: orderBy === undefined ? null : String(orderBy), desc: descending === true, where: '' });
-        return reply({ total: r.total, primaryKey: r.primaryKey, columns: r.columns, ...rowsOut(r.columns, r.rows) });
+        return reply({ total: r.total, ...(r.totalKind && r.totalKind !== 'exact' ? { totalIs: r.totalKind === 'estimate' ? 'the server estimate' : 'unknown (counting took too long)' } : {}), primaryKey: r.primaryKey, columns: r.columns, ...rowsOut(r.columns, r.rows) });
       },
     ),
     read(
@@ -198,7 +198,7 @@ export function readActions(api: DbCatzApi, viewer: ReadQuery, scopes: Scopes, w
         const c = await conn(connection);
         assertReadQuery(c.engine, String(query));
         const max = Number(maxRows ?? 100);
-        const results = await viewer.readQuery(c.id, String(database), String(query), Number(timeout ?? 30) * 1000, ctx.signal);
+        const results = await viewer.readQuery(c.id, String(database), String(query), Number(timeout ?? 30) * 1000, ctx.signal, DV_KEYVALUE.includes(c.engine) ? undefined : max);
         for (const r of results) logQuery(c.id, { text: r.statement, ms: r.ms, affected: r.affected, error: r.error });
         return reply(resultsOut(results, max, c.engine));
       },

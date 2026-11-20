@@ -2,6 +2,7 @@
 import { keyLabel } from '@shared/platform';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import type { DvAiAnswer, DvAiPreview, DvAiRequest, DvAiTurn, DvConnection, DvResult, DvRows, DvSavedQuery, DvTable } from '@shared/types';
+import { DV_QUERY_ROWS, DV_QUERY_ROWS_MAX } from '@shared/types';
 import { aiOn as aiOnFeature, attempt, api, notify, saveSettings, settings, showSettings } from '../store';
 import ConfirmDialog from '../components/ConfirmDialog.vue';
 import DvCodeEditor from './DvCodeEditor.vue';
@@ -316,6 +317,22 @@ async function execute(text: string) {
     if (editor.editable[editor.shown]) presets.value[`${editor.id}:${editor.shown}`] = await presetFor(editor.shown, editor);
   }
 }
+/**
+ * A result keeps its first DV_QUERY_ROWS rows (TODO §23); "Load more" runs that one statement again for 1,000 more,
+ * up to DV_QUERY_ROWS_MAX. Only reads are cut, so running it again changes nothing.
+ */
+const loadingMore = ref(false);
+async function loadMore(i: number) {
+  const editor = ed.value;
+  const r = editor.results[i];
+  loadingMore.value = true;
+  const next = (await attempt(() => api.dvQuery(props.conn.id, props.db, r.statement, r.rows.length + DV_QUERY_ROWS)))?.[0];
+  loadingMore.value = false;
+  if (!next) return;
+  if (next.error) return notify('error', next.error);
+  editor.results[i] = next;
+  if (editor.editable[i]) presets.value[`${editor.id}:${i}`] = await presetFor(i, editor);
+}
 /** A result as grid rows, with the table's primary key so cells can be edited. */
 async function presetFor(i: number, editor: Editor = ed.value): Promise<DvRows> {
   const r = editor.results[i];
@@ -606,7 +623,7 @@ const label = (x: Editor, i: number) => x.savedName ?? `${W.query === 'SQL' ? 'Q
                 </div>
                 <div v-else-if="!r.columns.length" class="m-3 alert alert-success alert-soft text-sm"><CatMood mood="success" class="size-7 shrink-0 -my-0.5" />{{ r.affected === null ? 'Done' : `${fmtNum(r.affected)} ${r.affected === 1 ? W.row : W.rows} affected` }} · {{ fmtMs(r.ms) }}</div>
                 <template v-else-if="ed.editable[i]">
-                  <DvDataGrid v-if="presets[`${ed.id}:${i}`]" :conn="conn" :db="db" :table="ed.editable[i]!" :preset="presets[`${ed.id}:${i}`]" @rerun="rerun" />
+                  <div v-if="presets[`${ed.id}:${i}`]" class="flex min-h-0 flex-1 flex-col"><DvDataGrid :conn="conn" :db="db" :table="ed.editable[i]!" :preset="presets[`${ed.id}:${i}`]" @rerun="rerun" /></div>
                   <div v-else class="grid flex-1 place-items-center opacity-60" @vue:mounted="ensurePreset(i)"><span class="loading loading-spinner loading-sm" /></div>
                 </template>
                 <template v-else>
@@ -620,13 +637,18 @@ const label = (x: Editor, i: number) => x.savedName ?? `${W.query === 'SQL' ? 'Q
                     </table>
                   </div>
                   <div class="flex h-8 shrink-0 items-center gap-2 border-t border-base-300/60 px-3 text-[11px] opacity-70">
-                    <span>{{ fmtNum(r.rows.length) }} {{ r.rows.length === 1 ? W.row : W.rows }}{{ r.rows.length >= 5000 ? ' (first 5000)' : '' }} · {{ fmtMs(r.ms) }}</span>
+                    <span>{{ fmtNum(r.rows.length) }} {{ r.rows.length === 1 ? W.row : W.rows }}{{ r.more ? ` (first ${fmtNum(r.rows.length)})` : '' }} · {{ fmtMs(r.ms) }}</span>
                     <span v-if="isSql(e)" class="opacity-70">· read-only (joins, aggregates or no primary key in the result)</span>
                     <span class="flex-1" />
                     <button class="btn btn-ghost btn-xs" @click="copyResult(r, 'csv')">Copy CSV</button>
                     <button class="btn btn-ghost btn-xs" @click="copyResult(r, 'json')">Copy JSON</button>
                   </div>
                 </template>
+                <div v-if="!r.error && r.columns.length && r.more" class="flex h-8 shrink-0 items-center gap-2 border-t border-base-300/60 bg-base-200/50 px-3 text-[11px]">
+                  <span class="opacity-70">Showing the first {{ fmtNum(r.rows.length) }} {{ W.rows }}: there are more.</span>
+                  <button v-if="r.rows.length < DV_QUERY_ROWS_MAX" class="btn btn-ghost btn-xs" :disabled="loadingMore" @click="loadMore(i)"><span v-if="loadingMore" class="loading loading-spinner loading-xs" />Load {{ fmtNum(DV_QUERY_ROWS) }} more</button>
+                  <span v-else-if="isSql(e)" class="opacity-70">Narrow the query with WHERE or LIMIT / OFFSET for the rest.</span>
+                </div>
               </div>
             </template>
           </div>
