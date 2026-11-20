@@ -195,13 +195,17 @@ const item = (label: string, command: ViewerCommand, accelerator?: string, extra
 const sep: MenuItemConstructorOptions = { type: 'separator' };
 
 function viewerMenu(): MenuItemConstructorOptions[] {
+  // Windows / Linux have no app menu: Settings… and Exit end File, the update item and About end Help (as DialCatz
+  // and DevCatz, user 2026-11-20). macOS keeps the DBCatz menu.
   return [
-    {
-      label: app.name,
-      submenu: overlay
-        ? [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'quit', label: 'Exit' }]
-        : [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'services' }, sep, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, sep, { role: 'quit' }],
-    },
+    ...(overlay
+      ? []
+      : [
+          {
+            label: app.name,
+            submenu: [item('About DBCatz', 'about'), item(updateLabel, 'checkUpdates'), sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'services' }, sep, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, sep, { role: 'quit' }],
+          } as MenuItemConstructorOptions,
+        ]),
     {
       label: 'File',
       submenu: [
@@ -214,6 +218,7 @@ function viewerMenu(): MenuItemConstructorOptions[] {
         item('Export…', 'export', 'CmdOrCtrl+E'),
         item('Import…', 'import', 'CmdOrCtrl+I'),
         item('Backup as .tar.gz…', 'backup', 'CmdOrCtrl+Shift+B'),
+        ...(overlay ? [sep, item('Settings…', 'settings', 'CmdOrCtrl+,'), sep, { role: 'quit', label: 'Exit' } as MenuItemConstructorOptions] : []),
       ],
     },
     {
@@ -259,7 +264,7 @@ function viewerMenu(): MenuItemConstructorOptions[] {
         ? [{ role: 'minimize' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab')]
         : [{ role: 'minimize' }, { role: 'zoom' }, sep, item('Next Tab', 'nextTab', 'Ctrl+Tab'), item('Previous Tab', 'prevTab', 'Ctrl+Shift+Tab'), sep, { role: 'front' }],
     },
-    { role: 'help', submenu: [item('Report a Bug…', 'reportBug'), item('Send Feedback…', 'sendFeedback')] },
+    { role: 'help', submenu: [item('Report a Bug…', 'reportBug'), item('Send Feedback…', 'sendFeedback'), ...(overlay ? [sep, item(updateLabel, 'checkUpdates'), item('About DBCatz', 'about')] : [])] },
   ];
 }
 
