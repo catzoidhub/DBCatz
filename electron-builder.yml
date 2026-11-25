@@ -77,7 +77,8 @@ nsis:
   createStartMenuShortcut: true
   uninstallDisplayName: ${productName}
 linux:
-  icon: resources/icon.png
+  # One file per size: hicolor has no 1024x1024 folder, so a lone 1024 px icon is never found (a gear in the dock).
+  icon: resources/linux/icons
   category: Development
   maintainer: Mahryan Rakhmatullah <109191921+ryankucingg@users.noreply.github.com>
   executableName: dbcatz
