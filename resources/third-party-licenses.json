@@ -1,6 +1,6 @@
 {
  "app": "DBCatz",
- "version": "1.2.34",
+ "version": "1.2.35",
  "packages": [
   {
    "name": "@anthropic-ai/sdk",
