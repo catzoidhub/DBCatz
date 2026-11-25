@@ -240,10 +240,14 @@ export async function importFrom(d: Driver, path: string, o: DvImportOptions, pr
     const statements = splitStatements(text);
     if (!statements.length) throw new Error(`No SQL statements in ${name}`);
     let n = 0;
-    for (const s of statements) {
-      await d.exec(o.database, s);
-      if (++n % 20 === 0 || n === statements.length) progress(`${n} / ${statements.length} statements`, n, statements.length);
-    }
+    const run = async (exec: (sql: string) => Promise<void>) => {
+      for (const s of statements) {
+        await exec(s);
+        if (++n % 20 === 0 || n === statements.length) progress(`${n} / ${statements.length} statements`, n, statements.length);
+      }
+    };
+    if (d.session) await d.session(o.database, run);
+    else await run((s) => d.exec(o.database, s));
     return `${n} statements run in ${o.database}`;
   }
   if (o.format === 'redis') {

@@ -77,6 +77,11 @@ export interface Driver {
   queryWithin?(db: string, sql: string, ms: number): Promise<QueryResult>;
   /** Several statements at once (imports, DDL scripts). */
   exec(db: string, sql: string): Promise<void>;
+  /**
+   * A script on one connection of its own, closed at the end: its SET, LOCK TABLES and transactions hold from one
+   * statement to the next, and none of them stays behind in the pool. Engines with one connection use exec().
+   */
+  session?<T>(db: string, fn: (exec: (sql: string) => Promise<void>) => Promise<T>): Promise<T>;
   close(): Promise<void>;
 
   // Document engines (MongoDB, Elasticsearch) do these themselves; SQL engines get them built from SQL in ops.ts.
@@ -340,6 +345,21 @@ class MysqlDriver implements Driver {
     await this.on(db, (c) => c.query(sql));
   }
 
+  async session<T>(db: string, fn: (exec: (sql: string) => Promise<void>) => Promise<T>): Promise<T> {
+    const c = await this.pool.getConnection();
+    const use = db ? `USE ${quoteIdent('mysql', db)}` : '';
+    try {
+      if (use) await c.query(use);
+      return await fn(async (sql) => {
+        await c.query(sql);
+        // The script stays in the database it was started for (a dump made with --databases names its own).
+        if (use && /^USE\b/i.test(leadOf(sql))) await c.query(use);
+      });
+    } finally {
+      c.destroy();
+    }
+  }
+
   async close() {
     await this.pool.end();
   }
@@ -547,6 +567,17 @@ class PgDriver implements Driver {
 
   async exec(db: string, sql: string) {
     await this.pool(db).query(sql);
+  }
+
+  async session<T>(db: string, fn: (exec: (sql: string) => Promise<void>) => Promise<T>): Promise<T> {
+    const c = await this.pool(db).connect();
+    try {
+      return await fn(async (sql) => {
+        await c.query(sql);
+      });
+    } finally {
+      c.release(true);
+    }
   }
 
   async close() {

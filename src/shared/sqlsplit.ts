@@ -63,8 +63,9 @@ export function splitStatements(sql: string): string[] {
     i++;
   }
   if (cur.trim()) out.push(cur.trim());
-  // A statement that is only comments is dropped.
-  return out.filter((s) => s.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, '').trim());
+  // A statement that is only comments is dropped — but MySQL / MariaDB run what is in /*! … */ and /*M! … */ (a
+  // mysqldump turns its foreign key checks off that way).
+  return out.filter((s) => s.replace(/--[^\n]*|\/\*(?!M?!)[\s\S]*?\*\//g, '').trim());
 }
 
 /** A query box's text as the statements it runs, one by one: what a guard checks is what runs. */

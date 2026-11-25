@@ -29,6 +29,9 @@ export const stripSql = (s: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** MySQL's and MariaDB's executable comments: version, then the SQL. */
+const EXECUTABLE = /\/\*M?!\d*([\s\S]*?)\*\//g;
+
 function sqlKind(stmt: string): StatementKind {
   const s = stripSql(stmt);
   const u = s.toUpperCase();
@@ -126,5 +129,18 @@ export function statementKind(engine: DbEngine, text: string): StatementKind {
   if (engine === 'redis' || engine === 'valkey') return redisKind(text);
   if (engine === 'mongodb') return mongoKind(text);
   if (engine === 'elasticsearch') return esKind(text);
-  return sqlKind(text);
+  const kind = sqlKind(text);
+  return engine === 'mysql' || engine === 'mariadb' ? withComments(text, kind) : kind;
+}
+
+/**
+ * MySQL / MariaDB run what is in an executable comment when the server is at least its version, so a statement with
+ * one counts as the riskier of the two: with the comment's text and without it.
+ */
+function withComments(text: string, plain: StatementKind): StatementKind {
+  const bodies = [...text.matchAll(EXECUTABLE)].map((m) => m[1]);
+  if (!bodies.length) return plain;
+  const kinds = [sqlKind(text.replace(EXECUTABLE, ' $1 ')), ...(stripSql(text) ? [plain] : bodies.map(sqlKind))];
+  const risky = kinds.find((k) => k.destructive);
+  return { read: kinds.every((k) => k.read), ddl: kinds.some((k) => k.ddl), destructive: !!risky, reason: risky?.reason ?? null };
 }
