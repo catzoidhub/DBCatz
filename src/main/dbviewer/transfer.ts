@@ -7,6 +7,7 @@ import { createGunzip } from 'node:zlib';
 import * as tar from 'tar';
 import type { DvExportOptions, DvImportOptions } from '@shared/types';
 import { DV_DOCUMENT, DV_KEYVALUE, DV_SQL } from '@shared/types';
+import { splitScript } from '@shared/sqlsplit';
 import { literal, quoteIdent, quoteTable, splitStatements, type Driver } from './driver';
 import { quoteArg } from './nosql';
 import { checkName, insertRow } from './ops';
@@ -215,6 +216,16 @@ async function writeDot(d: Driver, db: string, only: string[], out: WriteStream,
 /** pg_restore's choices when the dialog sent none (an import from Ask DBCatz or MCatzP). */
 const PG_DEFAULTS = { clean: false, owners: 'auto', jobs: 4 } as const;
 
+/**
+ * A dump made with --databases names its own: USE, CREATE DATABASE and (--add-drop-database) DROP DATABASE. An import
+ * goes into the database it was started for, so those for another one do not run.
+ */
+export function namesOtherDatabase(statement: string, database: string): boolean {
+  const s = statement.replace(/\/\*M?!\d*([\s\S]*?)\*\//g, ' $1 ').replace(/\/\*[\s\S]*?\*\/|^\s*(--|#)[^\n]*/gm, ' ').trim();
+  const m = /^(?:USE|(?:CREATE|DROP)\s+(?:DATABASE|SCHEMA)(?:\s+IF\s+(?:NOT\s+)?EXISTS)?)\s+(?:`((?:[^`]|``)+)`|([^\s;`]+))/i.exec(s);
+  return !!m && (m[1]?.replace(/``/g, '`') ?? m[2]) !== database;
+}
+
 export async function importFrom(d: Driver, path: string, o: DvImportOptions, progress: Progress, pg?: PgCtx): Promise<string> {
   const name = basename(path);
   let gz = false;
@@ -237,7 +248,9 @@ export async function importFrom(d: Driver, path: string, o: DvImportOptions, pr
       const v = /^-- Dumped by pg_dump version (\S+)/m.exec(text)?.[1] ?? null;
       return runPsql(pg, path, gz, o.database, v, progress);
     }
-    const statements = splitStatements(text);
+    const my = d.engine === 'mysql' || d.engine === 'mariadb';
+    const all = my ? splitScript(text) : splitStatements(text);
+    const statements = my && o.database ? all.filter((s) => !namesOtherDatabase(s, o.database)) : all;
     if (!statements.length) throw new Error(`No SQL statements in ${name}`);
     let n = 0;
     const run = async (exec: (sql: string) => Promise<void>) => {
@@ -248,7 +261,8 @@ export async function importFrom(d: Driver, path: string, o: DvImportOptions, pr
     };
     if (d.session) await d.session(o.database, run);
     else await run((s) => d.exec(o.database, s));
-    return `${n} statements run in ${o.database}`;
+    const skipped = all.length - statements.length;
+    return `${n} statements run in ${o.database}${skipped ? `; ${skipped} for other databases (USE, CREATE / DROP DATABASE) skipped` : ''}`;
   }
   if (o.format === 'redis') {
     const text = await readText(path);

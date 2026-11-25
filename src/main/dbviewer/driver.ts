@@ -352,8 +352,8 @@ class MysqlDriver implements Driver {
       if (use) await c.query(use);
       return await fn(async (sql) => {
         await c.query(sql);
-        // The script stays in the database it was started for (a dump made with --databases names its own).
-        if (use && /^USE\b/i.test(leadOf(sql))) await c.query(use);
+        // The script stays in the database it was started for, also after the dump made it anew.
+        if (use && /^(USE|CREATE\s+(DATABASE|SCHEMA))\b/i.test(leadOf(sql))) await c.query(use);
       });
     } finally {
       c.destroy();

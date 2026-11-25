@@ -5,27 +5,82 @@ import type { DbEngine } from './types';
  * PostgreSQL dollar quotes (good enough for the query editor and imports).
  */
 export function splitStatements(sql: string): string[] {
+  return split(sql, false);
+}
+
+/**
+ * A script file as the mysql client reads it: DELIMITER lines change what ends a statement (triggers, procedures,
+ * events in a mysqldump). Imports only: the query guards look at statements split on `;`, and MySQL runs several in one
+ * call, so a DELIMITER there could carry a write past them.
+ */
+export function splitScript(sql: string): string[] {
+  return split(sql, true);
+}
+
+/** Where MySQL's executable comment that opens at `i` ends: past the strings, line comments and comments inside it. */
+function executableEnd(sql: string, i: number): number {
+  let j = i + 3;
+  while (j < sql.length) {
+    const c = sql[j];
+    if (c === '*' && sql[j + 1] === '/') return j + 2;
+    if (c === '/' && sql[j + 1] === '*') {
+      const e = sql.indexOf('*/', j + 2);
+      if (e < 0) return sql.length;
+      j = e + 2;
+    } else if ((c === '-' && sql[j + 1] === '-' && /\s/.test(sql[j + 2] ?? ' ')) || c === '#') {
+      const e = sql.indexOf('\n', j);
+      const end = e < 0 ? sql.length : e;
+      // A comment on the last line also holds the closing mark.
+      const close = sql.indexOf('*/', j);
+      if (close >= 0 && close < end) return close + 2;
+      j = end;
+    } else if (c === "'" || c === '"' || c === '`') {
+      j++;
+      while (j < sql.length && sql[j] !== c) j += sql[j] === '\\' && c !== '`' ? 2 : 1;
+      j++;
+    } else j++;
+  }
+  return sql.length;
+}
+
+function split(sql: string, script: boolean): string[] {
   const out: string[] = [];
   let cur = '';
   let i = 0;
+  let delimiter = ';';
+  const command = /DELIMITER[ \t]+(\S+)[^\n]*/iy;
   while (i < sql.length) {
     const c = sql[i];
     const n = sql[i + 1];
-    if (c === '-' && n === '-') {
+    if (script && (c === 'D' || c === 'd') && (i === 0 || sql[i - 1] === '\n') && !cur.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, '').trim()) {
+      command.lastIndex = i;
+      const m = command.exec(sql);
+      if (m) {
+        delimiter = m[1];
+        cur = '';
+        i += m[0].length;
+        continue;
+      }
+    }
+    // MySQL's own rules in a script: -- needs a space after it, # starts a comment anywhere, $ quotes nothing.
+    if (c === '-' && n === '-' && (!script || /\s/.test(sql[i + 2] ?? ' '))) {
       const e = sql.indexOf('\n', i);
       const end = e < 0 ? sql.length : e;
       cur += sql.slice(i, end);
       i = end;
       continue;
     }
-    if (c === '#' && (cur.trim() === '' || /\n\s*$/.test(cur))) {
+    if (c === '#' && (script || cur.trim() === '' || /\n\s*$/.test(cur))) {
       const e = sql.indexOf('\n', i);
-      i = e < 0 ? sql.length : e;
+      const end = e < 0 ? sql.length : e;
+      // Inside a procedure the comment is part of its text.
+      if (script && cur.trim()) cur += sql.slice(i, end);
+      i = end;
       continue;
     }
     if (c === '/' && n === '*') {
       const e = sql.indexOf('*/', i + 2);
-      const end = e < 0 ? sql.length : e + 2;
+      const end = script && sql[i + 2] === '!' ? executableEnd(sql, i) : e < 0 ? sql.length : e + 2;
       cur += sql.slice(i, end);
       i = end;
       continue;
@@ -42,7 +97,7 @@ export function splitStatements(sql: string): string[] {
       i = j + 1;
       continue;
     }
-    if (c === '$') {
+    if (!script && c === '$') {
       const m = /^\$[A-Za-z_]*\$/.exec(sql.slice(i));
       if (m) {
         const tag = m[0];
@@ -53,10 +108,10 @@ export function splitStatements(sql: string): string[] {
         continue;
       }
     }
-    if (c === ';') {
+    if (c === delimiter[0] && (delimiter.length === 1 || sql.startsWith(delimiter, i))) {
       if (cur.trim()) out.push(cur.trim());
       cur = '';
-      i++;
+      i += delimiter.length;
       continue;
     }
     cur += c;
